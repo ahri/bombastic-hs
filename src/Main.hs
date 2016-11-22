@@ -3,55 +3,80 @@ module Main where
 import Data.List
 import Data.Maybe
 
+exampleDebugMap :: [String]
+exampleDebugMap =
+    [ "#####"
+    , "# . #"
+    , "#. .#"
+    , "# . #"
+    , "#####"
+    ]
+
 main :: IO ()
 main = do
     putStrLn ""
-    print $ opaqueState exampleState
+    putStrLn . maybe "Invalid Map" (show . opaqueState . flip startGame [p1, p2]) . mapFromDebug $ exampleDebugMap
     putStrLn ""
 
+p1 :: Player
 p1 = Player "1 foo" (Score 0) (BombCount 1) (FlameCount 1)
+p2 :: Player
 p2 = Player "2 bar" (Score 0) (BombCount 1) (FlameCount 1)
 
-newtype State = State [[Square]] deriving (Show, Eq)
 
-data Square
-    = Empty
+-- Storage
+
+newtype Map = Map [[Tile]] deriving (Eq, Show)
+
+data Tile
+    = EmptyTile
+    | IndestructibleTile
+    | DestructibleTile
+    | PlayerStartPosition
+    deriving (Eq, Show)
+
+-- State
+
+data State = State
+    [Maybe Player]
+    [[StateSquare]]
+    deriving (Eq, Show)
+
+data StateSquare
+    = EmptySquare
     | IndestructibleBlock
     | DestructibleBlock
     | InterestingSquare
-        { players :: [Player]
-        , bomb    :: Maybe Bomb
-        , flame   :: Maybe Flame
-        , powerup :: Maybe Powerup
-        }
-    deriving (Show, Eq)
+        [Player]
+        (Maybe Bomb)
+        (Maybe Flame)
+        (Maybe Powerup)
+    deriving (Eq, Show)
 
 data Player = Player
-    { name       :: String
-    , score      :: Score
-    , bombCount  :: BombCount
-    , flameCount :: FlameCount
-    }
-    deriving (Show, Eq)
+    String
+    Score
+    BombCount
+    FlameCount
+    deriving (Eq, Show)
 
 data Bomb = Bomb
-    { bombTicksLeft :: BombTicksLeft
-    , bombOwner     :: Player
-    }
-    deriving (Show, Eq)
+    BombTicksLeft
+    Player
+    deriving (Eq, Show)
 
 data Flame = Flame
-    { flameOwner     :: Player
-    }
-    deriving (Show, Eq)
+    Player
+    deriving (Eq, Show)
 
-data Powerup = BombPowerup | FlamePowerup deriving (Show, Eq)
+data Powerup = BombPowerup | FlamePowerup deriving (Eq, Show)
 
-newtype Score = Score Integer deriving (Show, Eq)
-newtype BombCount = BombCount Integer deriving (Show, Eq)
-newtype FlameCount = FlameCount Integer deriving (Show, Eq)
-newtype BombTicksLeft = BombTicksLeft Integer deriving (Show, Eq)
+newtype Score = Score Integer deriving (Eq, Show)
+newtype BombCount = BombCount Integer deriving (Eq, Show)
+newtype FlameCount = FlameCount Integer deriving (Eq, Show)
+newtype BombTicksLeft = BombTicksLeft Integer deriving (Eq, Show)
 
+-- Transmission
 
 newtype OpaqueState = OpaqueState [[OpaqueSquare]] deriving (Eq)
 newtype OpaqueSquare = OpaqueSquare [OpaqueItem] deriving (Eq)
@@ -59,32 +84,35 @@ newtype OpaqueSquare = OpaqueSquare [OpaqueItem] deriving (Eq)
 data OpaqueItem
     = OpaqueFlame
     | OpaqueBomb
-    | OpaquePlayer String
+    | OpaquePlayer Int
     | OpaqueBombPowerup
     | OpaqueFlamePowerup
     | OpaqueDestructibleBlock
     | OpaqueIndestructibleBlock
-    deriving (Show, Eq, Ord)
+    deriving (Eq, Ord, Show)
 
 
+-- TODO: should be State -> Maybe OpaqueState; if players exist on a square that are not in the overall game state, I shouldn't be able to serialize it. I'm currently cheating using fromJust - so maybe use sequence?
 opaqueState :: State -> OpaqueState
-opaqueState (State sqList2d) = OpaqueState . (fmap . fmap) opaqueify $ sqList2d
+opaqueState (State allPlayers sqList2d) = OpaqueState . (fmap . fmap) opaqueify $ sqList2d
     where
-        opaqueify :: Square -> OpaqueSquare
-        opaqueify Empty = OpaqueSquare []
+        opaqueify :: StateSquare -> OpaqueSquare
+        opaqueify EmptySquare = OpaqueSquare []
         opaqueify IndestructibleBlock = OpaqueSquare [OpaqueIndestructibleBlock]
         opaqueify DestructibleBlock = OpaqueSquare [OpaqueDestructibleBlock]
         opaqueify (InterestingSquare players bomb flame powerup) =
             OpaqueSquare $ toOpaquePlayers players ++ opaqueStuff bomb flame powerup
                 where
                     toOpaquePlayers :: [Player] -> [OpaqueItem]
-                    toOpaquePlayers = fmap (\(Player name _ _ _) -> OpaquePlayer name)
+                    toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ allPlayers)
                     opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
                     opaqueStuff b f p = catMaybes [const OpaqueBomb <$> b, const OpaqueFlame <$> f, opaquePowerup <$> p]
                         where
                             opaquePowerup :: Powerup -> OpaqueItem
                             opaquePowerup FlamePowerup = OpaqueFlamePowerup
                             opaquePowerup BombPowerup = OpaqueBombPowerup
+
+-- Debugging
 
 instance Show OpaqueSquare where
     show (OpaqueSquare lstItems) = toStr . foo $ lstItems
@@ -99,7 +127,7 @@ instance Show OpaqueSquare where
             toChar OpaqueDestructibleBlock = '.'
             toChar OpaqueFlame = '~'
             toChar OpaqueBomb = 'o'
-            toChar (OpaquePlayer (n:ns)) = n
+            toChar (OpaquePlayer p) = head . show $ p
             toChar OpaqueBombPowerup = 'b'
             toChar OpaqueFlamePowerup = 'f'
 
@@ -110,17 +138,45 @@ instance Show OpaqueState where
             opaqueify = (fmap . fmap) show
 
 
-exampleState :: State
-exampleState = State [[IndestructibleBlock, IndestructibleBlock, IndestructibleBlock, IndestructibleBlock, IndestructibleBlock]
-                     ,[IndestructibleBlock, Empty,               DestructibleBlock,   Empty,               IndestructibleBlock]
-                     ,[IndestructibleBlock, DestructibleBlock,   Empty,               DestructibleBlock,   IndestructibleBlock]
-                     ,[IndestructibleBlock, Empty,               DestructibleBlock,   Empty,               IndestructibleBlock]
-                     ,[IndestructibleBlock, IndestructibleBlock, IndestructibleBlock, IndestructibleBlock, IndestructibleBlock]
-                     ]
+-- Map loading
 
--- Transitions
--- empty -> player
--- empty -> flame
--- flame -> empty
--- player..., powerup, flame, bomb -> flame
---
+charToTile :: Char -> Maybe Tile
+charToTile '#' = Just IndestructibleTile
+charToTile '.' = Just DestructibleTile
+charToTile ' ' = Just EmptyTile
+charToTile 'S' = Just PlayerStartPosition
+charToTile  _  = Nothing
+
+mapFromDebug :: [String] -> Maybe Map
+-- mapFromDebug = fmap Map . sequence . (fmap sequence) . ((fmap . fmap) charToTile)
+mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
+
+mapFromFile :: String -> Maybe Map
+mapFromFile filename = undefined
+
+-- Game initialization
+
+startGame :: Map -> [Player] -> State
+startGame m ps = State (Just <$> ps) (m2s m)
+    where
+        m2s :: Map -> [[StateSquare]]
+        m2s (Map tiles2d) = (fmap . fmap) t2s tiles2d
+        t2s :: Tile -> StateSquare
+        t2s EmptyTile = EmptySquare
+        t2s IndestructibleTile = IndestructibleBlock
+        t2s DestructibleTile = DestructibleBlock
+        t2s PlayerStartPosition = InterestingSquare [p1] Nothing Nothing Nothing
+        -- TODO: cheating; need to incrementally assign players into positions
+
+-- Actions & transitions
+
+playerAction :: Player -> Action -> State -> State
+playerAction = undefined
+
+data Action = MoveUp | MoveDown | MoveLeft | MoveRight | DropBomb
+
+bombAction :: Bomb -> State -> State
+bombAction = undefined
+
+flameAction :: Flame -> State -> State
+flameAction = undefined
