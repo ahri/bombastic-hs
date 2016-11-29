@@ -6,8 +6,8 @@ import Data.Maybe
 exampleDebugMap :: [String]
 exampleDebugMap =
     [ "#####"
-    , "# . #"
-    , "#. .#"
+    , "#S. #"
+    , "#.S.#"
     , "# . #"
     , "#####"
     ]
@@ -157,16 +157,28 @@ mapFromFile filename = undefined
 -- Game initialization
 
 startGame :: Map -> [Player] -> State
-startGame m ps = State (Just <$> ps) (m2s m)
+startGame (Map tiles2d) ps = State (Just <$> ps) (fst3 (m2s [] ps tiles2d))
     where
-        m2s :: Map -> [[StateSquare]]
-        m2s (Map tiles2d) = (fmap . fmap) t2s tiles2d
+        fst3 :: (a, b, c) -> a
+        fst3 (e, _, _) = e
+
+        snd3 :: (a, b, c) -> b
+        snd3 (_, e, _) = e
+
+        m2s :: [[StateSquare]] -> [Player] -> [[Tile]] -> ([[StateSquare]], [Player], [[Tile]])
+        m2s ss ps [] = (ss, ps, [])
+        m2s ss ps (r : rs) = m2s (ss ++ [fst3 (r2s [] ps r)]) (snd3 (r2s [] ps r)) rs
+
+        r2s :: [StateSquare] -> [Player] -> [Tile] -> ([StateSquare], [Player], [Tile])
+        r2s ss ps [] = (ss, ps, [])
+        r2s ss [] (PlayerStartPosition : ts) = r2s (ss ++ [EmptySquare]) [] ts
+        r2s ss (p : ps) (PlayerStartPosition : ts) = r2s (ss ++ [InterestingSquare [p] Nothing Nothing Nothing]) ps ts
+        r2s ss ps (t : ts) = r2s (ss ++ [t2s t]) ps ts
+
         t2s :: Tile -> StateSquare
         t2s EmptyTile = EmptySquare
         t2s IndestructibleTile = IndestructibleBlock
         t2s DestructibleTile = DestructibleBlock
-        t2s PlayerStartPosition = InterestingSquare [p1] Nothing Nothing Nothing
-        -- TODO: cheating; need to incrementally assign players into positions
 
 -- Actions & transitions
 
