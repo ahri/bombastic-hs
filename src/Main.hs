@@ -5,18 +5,22 @@ import Data.Maybe
 
 exampleDebugMap :: [String]
 exampleDebugMap =
-    [ "#####"
-    , "#S. #"
-    , "#.S.#"
-    , "# . #"
-    , "#####"
+    [ "######"
+    , "#S.  #"
+    , "#.S..#"
+    , "#.. S#"
+    , "######"
     ]
 
 main :: IO ()
 main = do
     putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . opaqueState . flip startGame [p1, p2]) . mapFromDebug $ exampleDebugMap
+    putStrLn . maybe "Invalid Map" (show . opaqueState) $ state
     putStrLn ""
+    putStrLn . maybe "Invalid Map" (show . players) $ state
+    where
+        players (State ps _) = ps
+        state = startGame [p1, p2] <$> mapFromDebug exampleDebugMap
 
 p1 :: Player
 p1 = Player "1 foo" (Score 0) (BombCount 1) (FlameCount 1)
@@ -157,13 +161,15 @@ mapFromFile filename = undefined
 
 -- Game initialization
 
-startGame :: Map -> [Player] -> State
-startGame (Map tiles2d) ps = State (Just <$> ps) (fst3 (m2s [] ps tiles2d))
+startGame :: [Player] -> Map -> State
+startGame ps (Map tiles2d) = State (Just <$> playersIncluded) stateSquares
     where
-        fst3 :: (a, b, c) -> a
-        fst3 (e, _, _) = e
+        stateSquares = fst3 result
+        playersIncluded = filter (`notElem` playersLeftOver) ps
+        playersLeftOver = snd3 result
+        result = m2s [] ps tiles2d
 
-        snd3 :: (a, b, c) -> b
+        fst3 (e, _, _) = e
         snd3 (_, e, _) = e
 
         m2s :: [[StateSquare]] -> [Player] -> [[Tile]] -> ([[StateSquare]], [Player], [[Tile]])

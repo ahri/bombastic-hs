@@ -7,7 +7,7 @@ end
 
 desc "Lint the program"
 task :lint do
-  verbose(false) { sh "hlint src/Main.hs" }
+  verbose(false) { sh "hlint src/Main.hs; true" }
 end
 
 desc "Automatically apply lintings"
