@@ -102,26 +102,28 @@ opaqueState (State allPlayers sqList2d) = OpaqueState . (fmap . fmap) opaqueify 
         opaqueify DestructibleBlock = OpaqueSquare [OpaqueDestructibleBlock]
         opaqueify (InterestingSquare players bomb flame powerup) =
             OpaqueSquare $ toOpaquePlayers players ++ opaqueStuff bomb flame powerup
-                where
-                    toOpaquePlayers :: [Player] -> [OpaqueItem]
-                    toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ allPlayers)
-                    opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
-                    opaqueStuff b f p = catMaybes [const OpaqueBomb <$> b, const OpaqueFlame <$> f, opaquePowerup <$> p]
-                        where
-                            opaquePowerup :: Powerup -> OpaqueItem
-                            opaquePowerup FlamePowerup = OpaqueFlamePowerup
-                            opaquePowerup BombPowerup = OpaqueBombPowerup
+
+        toOpaquePlayers :: [Player] -> [OpaqueItem]
+        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ allPlayers)
+        opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
+        opaqueStuff b f p = catMaybes [OpaqueBomb <$ b, OpaqueFlame <$ f, opaquePowerup <$> p]
+
+        opaquePowerup :: Powerup -> OpaqueItem
+        opaquePowerup FlamePowerup = OpaqueFlamePowerup
+        opaquePowerup BombPowerup = OpaqueBombPowerup
 
 -- Debugging
 
 instance Show OpaqueSquare where
-    show (OpaqueSquare lstItems) = toStr . foo $ lstItems
+    show (OpaqueSquare lstItems) = toStr . osToChar $ lstItems
         where
             toStr :: Char -> String
             toStr c = [c]
-            foo :: [OpaqueItem] -> Char
-            foo [] = ' '
-            foo lst = toChar . minimum $ lst
+
+            osToChar :: [OpaqueItem] -> Char
+            osToChar [] = ' '
+            osToChar lst = toChar . minimum $ lst
+
             toChar :: OpaqueItem -> Char
             toChar OpaqueIndestructibleBlock = '#'
             toChar OpaqueDestructibleBlock = '.'
@@ -148,7 +150,6 @@ charToTile 'S' = Just PlayerStartPosition
 charToTile  _  = Nothing
 
 mapFromDebug :: [String] -> Maybe Map
--- mapFromDebug = fmap Map . sequence . (fmap sequence) . ((fmap . fmap) charToTile)
 mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
 mapFromFile :: String -> Maybe Map
