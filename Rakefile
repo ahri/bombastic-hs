@@ -8,7 +8,7 @@ task :build do
 end
 
 desc "Run the program"
-Task :run => :build do
+task :run => :build do
   verbose(false) { sh "stack exec bombastic 2>&1" }
 end
 
