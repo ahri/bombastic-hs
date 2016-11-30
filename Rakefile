@@ -8,8 +8,8 @@ task :build do
 end
 
 desc "Run the program"
-task :run do
-  verbose(false) { sh "stack runhaskell app/Main.hs -- -Wall -Werror 2>&1" }
+Task :run => :build do
+  verbose(false) { sh "stack exec bombastic 2>&1" }
 end
 
 desc "Test the program"
