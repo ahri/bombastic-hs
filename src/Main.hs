@@ -173,14 +173,17 @@ startGame ps (Map tiles2d) = State (Just <$> playersIncluded) stateSquares
         snd3 (_, e, _) = e
 
         m2s :: [[StateSquare]] -> [Player] -> [[Tile]] -> ([[StateSquare]], [Player], [[Tile]])
-        m2s ss ps [] = (ss, ps, [])
-        m2s ss ps (r : rs) = m2s (ss ++ [fst3 (r2s [] ps r)]) (snd3 (r2s [] ps r)) rs
+        m2s ssA psR [] = (ssA, psR, [])
+        m2s ssA psR (r : rs) = m2s stateSquaresAccumulator playersReducer rs
+            where
+                stateSquaresAccumulator = ssA ++ [fst3 (r2s [] psR r)]
+                playersReducer = snd3 (r2s [] psR r)
 
         r2s :: [StateSquare] -> [Player] -> [Tile] -> ([StateSquare], [Player], [Tile])
-        r2s ss ps [] = (ss, ps, [])
-        r2s ss [] (PlayerStartPosition : ts) = r2s (ss ++ [EmptySquare]) [] ts
-        r2s ss (p : ps) (PlayerStartPosition : ts) = r2s (ss ++ [InterestingSquare [p] Nothing Nothing Nothing]) ps ts
-        r2s ss ps (t : ts) = r2s (ss ++ [t2s t]) ps ts
+        r2s ssA psR [] = (ssA, psR, [])
+        r2s ssA [] (PlayerStartPosition : tsR) = r2s (ssA ++ [EmptySquare]) [] tsR
+        r2s ssA (p : psR) (PlayerStartPosition : tsR) = r2s (ssA ++ [InterestingSquare [p] Nothing Nothing Nothing]) psR tsR
+        r2s ssA psR (t : tsR) = r2s (ssA ++ [t2s t]) psR tsR
 
         t2s :: Tile -> StateSquare
         t2s EmptyTile = EmptySquare
