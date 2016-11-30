@@ -47,9 +47,11 @@ data State = State
     [[StateSquare]]
     deriving (Eq, Show)
 
-data PlayerSlot = PlayerSlot
-    Action
-    (Maybe Player)
+data PlayerSlot
+    = DisconnectedPlayer
+    | ConnectedPlayer
+        Action
+        Player
     deriving (Eq, Show)
 
 data Action
@@ -125,9 +127,11 @@ opaqueState (State allPlayers sqList2d) = OpaqueState . (fmap . fmap) opaqueify 
             OpaqueSquare $ toOpaquePlayers players ++ opaqueStuff bomb flame powerup
 
         toOpaquePlayers :: [Player] -> [OpaqueItem]
-        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ rawPlayers)
+        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex p $ rawPlayers)
             where
-                rawPlayers = (\(PlayerSlot _ p) -> p) <$> allPlayers
+                rawPlayers = mapMaybe search allPlayers
+                search DisconnectedPlayer = Nothing
+                search (ConnectedPlayer _ p) = Just p
 
         opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
         opaqueStuff b f p = catMaybes [OpaqueBomb <$ b, OpaqueFlame <$ f, opaquePowerup <$> p]
@@ -188,7 +192,7 @@ startGame ps (Map tiles2d) = State playerSlots stateSquares
     where
         stateSquares = fst3 result
         playerSlots :: [PlayerSlot]
-        playerSlots = (PlayerSlot NoAction) . Just <$> playersIncluded
+        playerSlots = (ConnectedPlayer NoAction) <$> playersIncluded
         playersIncluded = filter (`notElem` playersLeftOver) ps
         playersLeftOver = snd3 result
         result = m2s [] ps tiles2d
