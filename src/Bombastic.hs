@@ -1,32 +1,7 @@
-module Main where
+module Bombastic (getPlayers, mkPlayer, opaqueState, startGame, mapFromDebug) where
 
 import Data.List
 import Data.Maybe
-
-exampleDebugMap :: [String]
-exampleDebugMap =
-    [ "######"
-    , "#S.  #"
-    , "#.S..#"
-    , "#.. S#"
-    , "######"
-    ]
-
-main :: IO ()
-main = do
-    putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . opaqueState) $ state
-    putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . players) $ state
-    where
-        players (State ps _) = ps
-        state = startGame [p1, p2] <$> mapFromDebug exampleDebugMap
-
-p1 :: Player
-p1 = Player "1 foo" (Score 0) (BombCount 1) (FlameCount 1)
-p2 :: Player
-p2 = Player "2 bar" (Score 0) (BombCount 1) (FlameCount 1)
-
 
 -- Storage
 
@@ -46,6 +21,9 @@ data State = State
     [PlayerSlot]
     [[StateSquare]]
     deriving (Eq, Show)
+
+getPlayers :: State -> [PlayerSlot]
+getPlayers (State ps _) = ps
 
 data PlayerSlot
     = DisconnectedPlayer
@@ -81,6 +59,9 @@ data Player = Player
     BombCount
     FlameCount
     deriving (Eq, Show)
+
+mkPlayer :: String -> Player
+mkPlayer name = Player name (Score 0) (BombCount 1) (FlameCount 1)
 
 data Bomb = Bomb
     BombTicksLeft
@@ -181,8 +162,8 @@ charToTile  _  = Nothing
 mapFromDebug :: [String] -> Maybe Map
 mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
-mapFromFile :: String -> Maybe Map
-mapFromFile filename = undefined
+-- mapFromFile :: String -> Maybe Map
+-- mapFromFile filename = undefined
 
 
 -- Game initialization
@@ -215,17 +196,18 @@ startGame ps (Map tiles2d) = State playerSlots stateSquares
 
         t2s :: Tile -> StateSquare
         t2s EmptyTile = EmptySquare
+        t2s PlayerStartPosition = EmptySquare
         t2s IndestructibleTile = IndestructibleBlock
         t2s DestructibleTile = DestructibleBlock
 
 
 -- Actions & transitions
 
-playerAction :: Player -> Action -> State -> State
-playerAction = undefined
-
-bombAction :: Bomb -> State -> State
-bombAction = undefined
-
-flameAction :: Flame -> State -> State
-flameAction = undefined
+-- playerAction :: Player -> Action -> State -> State
+-- playerAction = undefined
+-- 
+-- bombAction :: Bomb -> State -> State
+-- bombAction = undefined
+-- 
+-- flameAction :: Flame -> State -> State
+-- flameAction = undefined
