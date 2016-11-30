@@ -173,7 +173,7 @@ startGame ps (Map tiles2d) = State playerSlots stateSquares
     where
         stateSquares = fst3 result
         playerSlots :: [PlayerSlot]
-        playerSlots = (ConnectedPlayer NoAction) <$> playersIncluded
+        playerSlots = ConnectedPlayer NoAction <$> playersIncluded
         playersIncluded = filter (`notElem` playersLeftOver) ps
         playersLeftOver = snd3 result
         result = m2s [] ps tiles2d
