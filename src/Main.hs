@@ -39,11 +39,27 @@ data Tile
     | PlayerStartPosition
     deriving (Eq, Show)
 
+
 -- State
 
 data State = State
-    [Maybe Player]
+    [PlayerSlot]
     [[StateSquare]]
+    deriving (Eq, Show)
+
+data PlayerSlot = PlayerSlot
+    Action
+    (Maybe Player)
+    deriving (Eq, Show)
+
+data Action
+    = NoAction
+    | MoveUp
+    | MoveDown
+    | MoveLeft
+    | MoveRight
+    | DropBomb
+    | QuitGame
     deriving (Eq, Show)
 
 data StateSquare
@@ -80,6 +96,7 @@ newtype BombCount = BombCount Integer deriving (Eq, Show)
 newtype FlameCount = FlameCount Integer deriving (Eq, Show)
 newtype BombTicksLeft = BombTicksLeft Integer deriving (Eq, Show)
 
+
 -- Transmission
 
 newtype OpaqueState = OpaqueState [[OpaqueSquare]] deriving (Eq)
@@ -108,13 +125,17 @@ opaqueState (State allPlayers sqList2d) = OpaqueState . (fmap . fmap) opaqueify 
             OpaqueSquare $ toOpaquePlayers players ++ opaqueStuff bomb flame powerup
 
         toOpaquePlayers :: [Player] -> [OpaqueItem]
-        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ allPlayers)
+        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex (Just p) $ rawPlayers)
+            where
+                rawPlayers = (\(PlayerSlot _ p) -> p) <$> allPlayers
+
         opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
         opaqueStuff b f p = catMaybes [OpaqueBomb <$ b, OpaqueFlame <$ f, opaquePowerup <$> p]
 
         opaquePowerup :: Powerup -> OpaqueItem
         opaquePowerup FlamePowerup = OpaqueFlamePowerup
         opaquePowerup BombPowerup = OpaqueBombPowerup
+
 
 -- Debugging
 
@@ -159,12 +180,15 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 mapFromFile :: String -> Maybe Map
 mapFromFile filename = undefined
 
+
 -- Game initialization
 
 startGame :: [Player] -> Map -> State
-startGame ps (Map tiles2d) = State (Just <$> playersIncluded) stateSquares
+startGame ps (Map tiles2d) = State playerSlots stateSquares
     where
         stateSquares = fst3 result
+        playerSlots :: [PlayerSlot]
+        playerSlots = (PlayerSlot NoAction) . Just <$> playersIncluded
         playersIncluded = filter (`notElem` playersLeftOver) ps
         playersLeftOver = snd3 result
         result = m2s [] ps tiles2d
@@ -190,12 +214,11 @@ startGame ps (Map tiles2d) = State (Just <$> playersIncluded) stateSquares
         t2s IndestructibleTile = IndestructibleBlock
         t2s DestructibleTile = DestructibleBlock
 
+
 -- Actions & transitions
 
 playerAction :: Player -> Action -> State -> State
 playerAction = undefined
-
-data Action = MoveUp | MoveDown | MoveLeft | MoveRight | DropBomb
 
 bombAction :: Bomb -> State -> State
 bombAction = undefined
