@@ -19,10 +19,10 @@ main = hspec $ do
                         , "#.. S#"
                         , "######"
                         ]
-                    expected = Just (intercalate "\n"
+                    expected = Just . intercalate "\n" $
                         [ "######"
                         , "#0.  #"
                         , "#.1..#"
                         , "#..  #"
                         , "######"
-                        ])
+                        ]
