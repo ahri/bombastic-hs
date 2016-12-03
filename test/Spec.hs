@@ -64,11 +64,11 @@ main = hspec $ do
                 let
                     opaqueInitialState = show . opaqueState <$> initialState
                     opaqueStateWithNextActionQueued = show . opaqueState <$> stateWithNextActionQueued
-                    opaqueStateAfterTick = show . opaqueState <$> stateAfterTick
+                    -- opaqueStateAfterTick = show . opaqueState <$> stateAfterTick
 
                     initialState = startGame players <$> mapFromDebug testMap
                     stateWithNextActionQueued = queueAction player MoveUp <$> initialState
-                    stateAfterTick = tick <$> stateWithNextActionQueued
+                    -- stateAfterTick = tick <$> stateWithNextActionQueued
 
                     players = [player]
                     player = mkPlayer "p1"
@@ -96,10 +96,11 @@ main = hspec $ do
                         , "#####"
                         ])
 
-                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#   #"
-                        , "#####"
-                        ])
+                pendingWith "implement tick!"
+                -- opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                --         [ "#####"
+                --         , "# 0 #"
+                --         , "#   #"
+                --         , "#   #"
+                --         , "#####"
+                --         ])

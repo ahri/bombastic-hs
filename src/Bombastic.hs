@@ -27,9 +27,11 @@ data Tile
 
 -- State
 
+newtype Board = Board [[StateSquare]] deriving (Eq, Show)
+
 data State = State
     [PlayerSlot]
-    [[StateSquare]]
+    Board
     deriving (Eq, Show)
 
 getPlayers :: State -> [PlayerSlot]
@@ -108,7 +110,7 @@ data OpaqueItem
 
 -- TODO: should be State -> Maybe OpaqueState; if players exist on a square that are not in the overall game state, I shouldn't be able to serialize it. I'm currently cheating using fromJust - so maybe use sequence?
 opaqueState :: State -> OpaqueState
-opaqueState (State allPlayers sqList2d) = OpaqueState . (fmap . fmap) opaqueify $ sqList2d
+opaqueState (State allPlayers (Board sqList2d)) = OpaqueState . (fmap . fmap) opaqueify $ sqList2d
     where
         opaqueify :: StateSquare -> OpaqueSquare
         opaqueify EmptySquare = OpaqueSquare []
@@ -179,7 +181,7 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 -- Game initialization
 
 startGame :: [Player] -> Map -> State
-startGame ps (Map tiles2d) = State playerSlots stateSquares
+startGame ps (Map tiles2d) = State playerSlots (Board stateSquares)
     where
         stateSquares = fst3 result
         playerSlots :: [PlayerSlot]
@@ -214,7 +216,14 @@ startGame ps (Map tiles2d) = State playerSlots stateSquares
 -- Actions & transitions
 
 queueAction :: Player -> Action -> State -> State
-queueAction _ _ s = s
+queueAction player action (State playerSlots board) = State (replacePlayerAction playerSlots) board
+    where
+        replacePlayerAction :: [PlayerSlot] -> [PlayerSlot]
+        replacePlayerAction [] = []
+        replacePlayerAction (DisconnectedPlayer : ss) = DisconnectedPlayer : replacePlayerAction ss
+        replacePlayerAction (ConnectedPlayer a p : ss)
+            | p == player = ConnectedPlayer action p : replacePlayerAction ss
+            | otherwise = ConnectedPlayer a p : replacePlayerAction ss
 
 tick :: State -> State
 tick s = s
