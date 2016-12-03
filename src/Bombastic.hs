@@ -1,4 +1,14 @@
-module Bombastic (getPlayers, mkPlayer, opaqueState, startGame, mapFromDebug) where
+module Bombastic -- TODO: group exports
+    ( getPlayers
+    , mkPlayer
+    , opaqueState
+    , startGame
+    , mapFromDebug
+    , tick
+    , queueAction
+    , Action
+        ( MoveUp )
+    ) where
 
 import Data.List
 import Data.Maybe
@@ -202,6 +212,12 @@ startGame ps (Map tiles2d) = State playerSlots stateSquares
 
 
 -- Actions & transitions
+
+queueAction :: Player -> Action -> State -> State
+queueAction _ _ s = s
+
+tick :: State -> State
+tick s = s
 
 -- playerAction :: Player -> Action -> State -> State
 -- playerAction = undefined
