@@ -1,17 +1,22 @@
-module Bombastic -- TODO: group exports
-    ( getPlayers
+module Bombastic
+    ( mapFromDebug
     , mkPlayer
-    , opaqueState
     , startGame
-    , mapFromDebug
     , tick
+
     , queueAction
-    , Action
-        ( MoveUp )
+    , Action (..)
+
+    , opaqueify
+    , OpaqueState (..)
+    , Coords (..)
+    , Board (..)
+    , Cell (..)
+    , OpaquePlayer (..)
+    , OpaqueStuff (..)
     ) where
 
 import Data.List
-import Data.Maybe
 
 -- Storage
 
@@ -27,22 +32,31 @@ data Tile
 
 -- State
 
-newtype Board = Board [[StateSquare]] deriving (Eq, Show)
-
 data State = State
-    [PlayerSlot]
     Board
+    [PlayerSlot]
+    [Stuff]
+    [Bomb]
     deriving (Eq, Show)
 
-getPlayers :: State -> [PlayerSlot]
-getPlayers (State ps _) = ps
+newtype Board = Board [[Cell]] deriving (Eq, Show)
 
 data PlayerSlot
     = DisconnectedPlayer
     | ConnectedPlayer
         Action
         Player
+        Coords
     deriving (Eq, Show)
+
+data Stuff
+    = DestructibleBlock Coords
+    | Flame Coords Player
+    | FlamePowerup Coords
+    | BombPowerup Coords
+    deriving (Eq, Show)
+
+newtype Coords = Coords (Int, Int) deriving (Eq, Show)
 
 data Action
     = NoAction
@@ -54,37 +68,28 @@ data Action
     | QuitGame
     deriving (Eq, Show)
 
-data StateSquare
-    = EmptySquare
+data Cell
+    = EmptyCell
     | IndestructibleBlock
-    | DestructibleBlock
-    | InterestingSquare
-        [Player]
-        (Maybe Bomb)
-        (Maybe Flame)
-        (Maybe Powerup)
     deriving (Eq, Show)
 
 data Player = Player
-    String
+    PlayerName
     Score
     BombCount
     FlameCount
     deriving (Eq, Show)
 
+newtype PlayerName = PlayerName String deriving (Eq, Show)
+
 mkPlayer :: String -> Player
-mkPlayer name = Player name (Score 0) (BombCount 1) (FlameCount 1)
+mkPlayer name = Player (PlayerName name) (Score 0) (BombCount 1) (FlameCount 1)
 
 data Bomb = Bomb
+    Coords
     BombTicksLeft
     Player
     deriving (Eq, Show)
-
-data Flame = Flame
-    Player
-    deriving (Eq, Show)
-
-data Powerup = BombPowerup | FlamePowerup deriving (Eq, Show)
 
 newtype Score = Score Integer deriving (Eq, Show)
 newtype BombCount = BombCount Integer deriving (Eq, Show)
@@ -94,72 +99,72 @@ newtype BombTicksLeft = BombTicksLeft Integer deriving (Eq, Show)
 
 -- Transmission
 
-newtype OpaqueState = OpaqueState [[OpaqueSquare]] deriving (Eq)
-newtype OpaqueSquare = OpaqueSquare [OpaqueItem] deriving (Eq)
-
-data OpaqueItem
-    = OpaqueFlame
-    | OpaqueBomb
-    | OpaquePlayer Int
-    | OpaqueBombPowerup
-    | OpaqueFlamePowerup
-    | OpaqueDestructibleBlock
-    | OpaqueIndestructibleBlock
-    deriving (Eq, Ord, Show)
-
-
--- TODO: should be State -> Maybe OpaqueState; if players exist on a square that are not in the overall game state, I shouldn't be able to serialize it. I'm currently cheating using fromJust - so maybe use sequence?
-opaqueState :: State -> OpaqueState
-opaqueState (State allPlayers (Board sqList2d)) = OpaqueState . (fmap . fmap) opaqueify $ sqList2d
-    where
-        opaqueify :: StateSquare -> OpaqueSquare
-        opaqueify EmptySquare = OpaqueSquare []
-        opaqueify IndestructibleBlock = OpaqueSquare [OpaqueIndestructibleBlock]
-        opaqueify DestructibleBlock = OpaqueSquare [OpaqueDestructibleBlock]
-        opaqueify (InterestingSquare players bomb flame powerup) =
-            OpaqueSquare $ toOpaquePlayers players ++ opaqueStuff bomb flame powerup
-
-        toOpaquePlayers :: [Player] -> [OpaqueItem]
-        toOpaquePlayers = fmap (\p -> OpaquePlayer . fromJust . elemIndex p $ rawPlayers)
-            where
-                rawPlayers = mapMaybe search allPlayers
-                search DisconnectedPlayer = Nothing
-                search (ConnectedPlayer _ p) = Just p
-
-        opaqueStuff :: Maybe Bomb -> Maybe Flame -> Maybe Powerup -> [OpaqueItem]
-        opaqueStuff b f p = catMaybes [OpaqueBomb <$ b, OpaqueFlame <$ f, opaquePowerup <$> p]
-
-        opaquePowerup :: Powerup -> OpaqueItem
-        opaquePowerup FlamePowerup = OpaqueFlamePowerup
-        opaquePowerup BombPowerup = OpaqueBombPowerup
-
-
--- Debugging
-
-instance Show OpaqueSquare where
-    show (OpaqueSquare lstItems) = toStr . osToChar $ lstItems
-        where
-            toStr :: Char -> String
-            toStr c = [c]
-
-            osToChar :: [OpaqueItem] -> Char
-            osToChar [] = ' '
-            osToChar lst = toChar . minimum $ lst
-
-            toChar :: OpaqueItem -> Char
-            toChar OpaqueIndestructibleBlock = '#'
-            toChar OpaqueDestructibleBlock = '.'
-            toChar OpaqueFlame = '~'
-            toChar OpaqueBomb = 'o'
-            toChar (OpaquePlayer p) = head . show $ p
-            toChar OpaqueBombPowerup = 'b'
-            toChar OpaqueFlamePowerup = 'f'
+data OpaqueState = OpaqueState
+    Board
+    [OpaquePlayer]
+    [OpaqueStuff]
+    [OpaqueBomb]
+    deriving (Eq)
 
 instance Show OpaqueState where
-    show (OpaqueState lst2d) = join . fmap concat . opaqueify $ lst2d
+    show (OpaqueState board _ _ _) = stringify board
         where
-            join = intercalate "\n"
-            opaqueify = (fmap . fmap) show
+            stringify (Board cells2d) = intercalate "\n"
+                $ stringify2d (Coords (0, 0)) cells2d
+
+            stringify2d :: Coords -> [[Cell]] -> [String]
+            stringify2d _ [] = []
+            stringify2d coords@(Coords (x, y)) (r:rs)
+                = stringify1d coords r
+                : stringify2d (Coords (x, y + 1)) rs
+
+            stringify1d :: Coords -> [Cell] -> String
+            stringify1d _ [] = []
+            stringify1d coords@(Coords (x, y)) (c:cs)
+                = stringifyCell coords c
+                : stringify1d (Coords (x + 1, y)) cs
+
+            stringifyCell :: Coords -> Cell -> Char
+            stringifyCell _ IndestructibleBlock = '#'
+            stringifyCell _ EmptyCell = ' '
+            -- TODO: use coords to look up, in order:
+                -- stuff (should it be a map?)
+                -- bomb
+                -- player (first)
+
+data OpaquePlayer
+    = OpaqueDisconnectedPlayer
+    | OpaqueConnectedPlayer Coords
+    deriving (Eq, Show)
+
+data OpaqueStuff
+    = OpaqueDestructibleBlock Coords
+    | OpaqueFlame Coords
+    | OpaqueFlamePowerup Coords
+    | OpaqueBombPowerup Coords
+    deriving (Eq, Show)
+
+data OpaqueBomb = OpaqueBomb Coords deriving (Eq, Show)
+
+opaqueify :: State -> OpaqueState
+opaqueify (State board playerSlots stuffs bombs) = OpaqueState
+    board
+    (opaqueifyPlayerSlot <$> playerSlots)
+    (opaqueifyStuff      <$> stuffs)
+    (opaqueifyBomb       <$> bombs)
+    where
+        opaqueifyPlayerSlot :: PlayerSlot -> OpaquePlayer
+        opaqueifyPlayerSlot DisconnectedPlayer      = OpaqueDisconnectedPlayer
+        opaqueifyPlayerSlot (ConnectedPlayer _ _ c) = OpaqueConnectedPlayer c
+
+        opaqueifyStuff :: Stuff -> OpaqueStuff
+        opaqueifyStuff (DestructibleBlock c) = OpaqueDestructibleBlock c
+        opaqueifyStuff (Flame c _)           = OpaqueFlame c
+        opaqueifyStuff (FlamePowerup c)      = OpaqueFlamePowerup c
+        opaqueifyStuff (BombPowerup c)       = OpaqueBombPowerup c
+
+        opaqueifyBomb :: Bomb -> OpaqueBomb
+        opaqueifyBomb (Bomb c _ _) = OpaqueBomb c
 
 
 -- Map loading
@@ -174,65 +179,79 @@ charToTile  _  = Nothing
 mapFromDebug :: [String] -> Maybe Map
 mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
--- mapFromFile :: String -> Maybe Map
--- mapFromFile filename = undefined
-
 
 -- Game initialization
 
 startGame :: [Player] -> Map -> State
-startGame ps (Map tiles2d) = State playerSlots (Board stateSquares)
+startGame players (Map tiles2d) = State board playerSlots stuffs []
     where
-        stateSquares = fst3 result
-        playerSlots :: [PlayerSlot]
-        playerSlots = ConnectedPlayer NoAction <$> playersIncluded
-        playersIncluded = filter (`notElem` playersLeftOver) ps
-        playersLeftOver = snd3 result
-        result = m2s [] ps tiles2d
+        board = Board . el1_3 $ converted
+        playerSlots = el2_3 converted
+        stuffs = el3_3 converted
 
-        fst3 (e, _, _) = e
-        snd3 (_, e, _) = e
+        el1_3 (el, _, _) = el
+        el2_3 (_, el, _) = el
+        el3_3 (_, _, el) = el
 
-        m2s :: [[StateSquare]] -> [Player] -> [[Tile]] -> ([[StateSquare]], [Player], [[Tile]])
-        m2s ssA psR [] = (ssA, psR, [])
-        m2s ssA psR (r : rs) = m2s stateSquaresAccumulator playersReducer rs
+        el1_4 (el, _, _, _) = el
+        el2_4 (_, el, _, _) = el
+        el3_4 (_, _, el, _) = el
+        el4_4 (_, _, _, el) = el
+
+        converted = convert (Coords (0, 0)) players tiles2d
+
+        convert :: Coords -> [Player] -> [[Tile]]
+                -> ([[Cell]], [PlayerSlot], [Stuff])
+        convert _ _ [] = ([], [], [])
+        convert coords@(Coords (x, y)) ps (tr:trs) = 
+            ( el1_4 convertedRow  : el1_3 recurse
+            , el2_4 convertedRow ++ el2_3 recurse
+            , el3_4 convertedRow ++ el3_3 recurse
+            )
             where
-                stateSquaresAccumulator = ssA ++ [fst3 (r2s [] psR r)]
-                playersReducer = snd3 (r2s [] psR r)
+                recurse = convert (Coords (x, y + 1)) (el4_4 convertedRow) trs
+                convertedRow = convertRow coords ps tr
 
-        r2s :: [StateSquare] -> [Player] -> [Tile] -> ([StateSquare], [Player], [Tile])
-        r2s ssA psR [] = (ssA, psR, [])
-        r2s ssA [] (PlayerStartPosition : tsR) = r2s (ssA ++ [EmptySquare]) [] tsR
-        r2s ssA (p : psR) (PlayerStartPosition : tsR) = r2s (ssA ++ [InterestingSquare [p] Nothing Nothing Nothing]) psR tsR
-        r2s ssA psR (t : tsR) = r2s (ssA ++ [t2s t]) psR tsR
+        convertRow :: Coords -> [Player] -> [Tile]
+                   -> ([Cell], [PlayerSlot], [Stuff], [Player])
+        convertRow _ ps [] = ([], [], [], ps)
+        convertRow coords@(Coords (x, y)) ps (t:ts) =
+            ( convertTile t      : el1_4 recurse
+            , fst playerLoaded  ++ el2_4 recurse
+            , addStuff t coords ++ el3_4 recurse
+            , el4_4 recurse
+            )
+            where
+                recurse = convertRow (Coords (x + 1, y)) (snd playerLoaded) ts
+                playerLoaded = loadPlayer t coords ps
 
-        t2s :: Tile -> StateSquare
-        t2s EmptyTile = EmptySquare
-        t2s PlayerStartPosition = EmptySquare
-        t2s IndestructibleTile = IndestructibleBlock
-        t2s DestructibleTile = DestructibleBlock
+        convertTile :: Tile -> Cell
+        convertTile EmptyTile           = EmptyCell
+        convertTile IndestructibleTile  = IndestructibleBlock
+        convertTile PlayerStartPosition = EmptyCell
+        convertTile DestructibleTile    = EmptyCell
 
+        loadPlayer :: Tile -> Coords -> [Player] -> ([PlayerSlot], [Player])
+        loadPlayer PlayerStartPosition coords (p:ps) =
+            ([ConnectedPlayer NoAction p coords], ps)
+        loadPlayer _ _ ps = ([], ps)
+
+        addStuff :: Tile -> Coords -> [Stuff]
+        addStuff DestructibleTile coords = [DestructibleBlock coords]
+        addStuff _ _ = []
 
 -- Actions & transitions
 
 queueAction :: Player -> Action -> State -> State
-queueAction player action (State playerSlots board) = State (replacePlayerAction playerSlots) board
+queueAction player action (State board playerSlots stuffs bombs)
+    = State board (replacePlayerAction playerSlots) stuffs bombs
     where
         replacePlayerAction :: [PlayerSlot] -> [PlayerSlot]
         replacePlayerAction [] = []
         replacePlayerAction (DisconnectedPlayer : ss) = DisconnectedPlayer : replacePlayerAction ss
-        replacePlayerAction (ConnectedPlayer a p : ss)
-            | p == player = ConnectedPlayer action p : replacePlayerAction ss
-            | otherwise = ConnectedPlayer a p : replacePlayerAction ss
+        replacePlayerAction (ConnectedPlayer a p c : ss)
+            | p == player = ConnectedPlayer action p c : replacePlayerAction ss
+            | otherwise = ConnectedPlayer a p c : replacePlayerAction ss
 
 tick :: State -> State
 tick s = s
-
--- playerAction :: Player -> Action -> State -> State
--- playerAction = undefined
--- 
--- bombAction :: Bomb -> State -> State
--- bombAction = undefined
--- 
--- flameAction :: Flame -> State -> State
--- flameAction = undefined

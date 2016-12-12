@@ -13,6 +13,9 @@ validMap =
     , "###################"
     ]
 
+-- cellAt :: Coords -> OpaqueState -> Cell
+-- cellAt (Coords (x, y)) (OpaqueState (Board cells2d) _ _ _) = (cells2d !! y) !! x
+
 main :: IO ()
 main = hspec $ do
     describe "Map load" $ do
@@ -27,7 +30,7 @@ main = hspec $ do
 
         it "valid map loads correctly" $ do
             let
-                opaque = show . opaqueState <$> state
+                opaque = show . opaqueify <$> state
                 state = startGame players <$> mapFromDebug validMap
                 players = [mkPlayer "p1", mkPlayer "p2"]
 
@@ -43,9 +46,41 @@ main = hspec $ do
 
             opaque `shouldBe` expected
 
+        it "asymmetrical map loads the right way up" $ do
+            let
+                cells = getCells <$> opaque
+                getCells (OpaqueState (Board cells2d) _ _ _) = cells2d
+                opaque = opaqueify . startGame [] <$> mapFromDebug
+                    [ "# "
+                    , "  "
+                    ]
+
+            cells `shouldBe` Just
+                [ [IndestructibleBlock , EmptyCell]
+                , [EmptyCell           , EmptyCell]
+                ]
+
+        it "player number is correct" $ do
+            let 
+                opaque = opaqueify . startGame players <$> mapFromDebug
+                    [ "SS"
+                    , "S "
+                    ]
+                players =
+                    [ mkPlayer "p1"
+                    , mkPlayer "p2"
+                    ]
+                getPlayers (OpaqueState _ ps _ _) = ps
+
+            (getPlayers <$> opaque) `shouldBe` Just
+                [ OpaqueConnectedPlayer (Coords (0, 0))
+                , OpaqueConnectedPlayer (Coords (1, 0))
+                ]
+
+
         it "invalid map loads as Nothing" $ do
             let
-                opaque = show . opaqueState <$> state
+                opaque = show . opaqueify <$> state
                 state = startGame players <$> mapFromDebug invalidMap
                 players = [mkPlayer "p1", mkPlayer "p2"]
 
@@ -62,9 +97,9 @@ main = hspec $ do
         context "movement" $ do
             it "up" $ do
                 let
-                    opaqueInitialState = show . opaqueState <$> initialState
-                    opaqueStateWithNextActionQueued = show . opaqueState <$> stateWithNextActionQueued
-                    -- opaqueStateAfterTick = show . opaqueState <$> stateAfterTick
+                    opaqueInitialState = show . opaqueify <$> initialState
+                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
+                    -- opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
 
                     initialState = startGame players <$> mapFromDebug testMap
                     stateWithNextActionQueued = queueAction player MoveUp <$> initialState

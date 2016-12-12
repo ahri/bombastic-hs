@@ -5,7 +5,7 @@ import Bombastic
 exampleDebugMap :: [String]
 exampleDebugMap =
     [ "######"
-    , "#S.  #"
+    , "#S.S #"
     , "#.S..#"
     , "#.. S#"
     , "######"
@@ -14,9 +14,14 @@ exampleDebugMap =
 main :: IO ()
 main = do
     let
-        state = startGame [mkPlayer "p1", mkPlayer "p2"] <$> mapFromDebug exampleDebugMap
+        getPlayers (OpaqueState _ players _ _) = players
+        oState = opaqueify <$> state
+        state = startGame [mkPlayer "p1", mkPlayer "p2"]
+            <$> mapFromDebug exampleDebugMap
 
     putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . opaqueState) $ state
+    putStrLn . maybe "Invalid Map" show $ oState
     putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . getPlayers) $ state
+    putStrLn . maybe "Invalid Map" (show . getPlayers) $ oState
+    putStrLn ""
+    print state
