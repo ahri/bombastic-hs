@@ -107,7 +107,7 @@ data OpaqueState = OpaqueState
     deriving (Eq)
 
 instance Show OpaqueState where
-    show (OpaqueState board _ _ _) = stringify board
+    show (OpaqueState board players stuffs bombs) = stringify board
         where
             stringify (Board cells2d) = intercalate "\n"
                 $ stringify2d (Coords (0, 0)) cells2d
@@ -126,11 +126,47 @@ instance Show OpaqueState where
 
             stringifyCell :: Coords -> Cell -> Char
             stringifyCell _ IndestructibleBlock = '#'
-            stringifyCell _ EmptyCell = ' '
-            -- TODO: use coords to look up, in order:
-                -- stuff (should it be a map?)
-                -- bomb
-                -- player (first)
+            stringifyCell coords EmptyCell =
+                firstJustOrDefault coords ' '
+                    [ (chrFromStuffs stuffs)
+                    , (chrFromBombs bombs)
+                    , (chrFromPlayers 0 players)
+                    ]
+                where
+                    firstJustOrDefault :: a -> b -> [(a -> Maybe b)] -> b
+                    firstJustOrDefault _ def [] = def
+                    firstJustOrDefault input def (f:fs) = case (f input) of
+                        (Just o) ->  o
+                        Nothing  -> firstJustOrDefault input def fs
+
+                    -- TODO: map of (Coords, OpaqueStuff) would be prettier
+                    chrFromStuffs :: [OpaqueStuff] -> Coords -> Maybe Char
+                    chrFromStuffs [] _ = Nothing
+                    chrFromStuffs ((OpaqueDestructibleBlock (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just '.'
+                        | otherwise = chrFromStuffs ss coords'
+                    chrFromStuffs ((OpaqueFlame (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just '~'
+                        | otherwise = chrFromStuffs ss coords'
+                    chrFromStuffs ((OpaqueFlamePowerup (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just 'f'
+                        | otherwise = chrFromStuffs ss coords'
+                    chrFromStuffs ((OpaqueBombPowerup (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just 'b'
+                        | otherwise = chrFromStuffs ss coords'
+
+                    chrFromBombs :: [OpaqueBomb] -> Coords -> Maybe Char
+                    chrFromBombs [] _ = Nothing
+                    chrFromBombs ((OpaqueBomb (Coords (x', y'))):bs) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just 'x'
+                        | otherwise = chrFromBombs bs coords'
+
+                    chrFromPlayers :: Int -> [OpaquePlayer] -> Coords -> Maybe Char
+                    chrFromPlayers _ [] _ = Nothing
+                    chrFromPlayers i (OpaqueDisconnectedPlayer:ps) coords' = chrFromPlayers (i + 1) ps coords'
+                    chrFromPlayers i ((OpaqueConnectedPlayer (Coords (x', y'))):ps) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just ((show i) !! 0)
+                        | otherwise = chrFromPlayers (i + 1) ps coords'
 
 data OpaquePlayer
     = OpaqueDisconnectedPlayer
