@@ -128,44 +128,44 @@ instance Show OpaqueState where
             stringifyCell _ IndestructibleBlock = '#'
             stringifyCell coords EmptyCell =
                 firstJustOrDefault coords ' '
-                    [ (chrFromStuffs stuffs)
-                    , (chrFromBombs bombs)
-                    , (chrFromPlayers 0 players)
+                    [ chrFromStuffs stuffs
+                    , chrFromBombs bombs
+                    , chrFromPlayers 0 players
                     ]
                 where
-                    firstJustOrDefault :: a -> b -> [(a -> Maybe b)] -> b
+                    firstJustOrDefault :: a -> b -> [a -> Maybe b] -> b
                     firstJustOrDefault _ def [] = def
-                    firstJustOrDefault input def (f:fs) = case (f input) of
+                    firstJustOrDefault input def (f:fs) = case f input of
                         (Just o) ->  o
                         Nothing  -> firstJustOrDefault input def fs
 
                     -- TODO: map of (Coords, OpaqueStuff) would be prettier
                     chrFromStuffs :: [OpaqueStuff] -> Coords -> Maybe Char
                     chrFromStuffs [] _ = Nothing
-                    chrFromStuffs ((OpaqueDestructibleBlock (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                    chrFromStuffs (OpaqueDestructibleBlock (Coords (x', y')):ss) coords'@(Coords (x, y))
                         | x == x' && y == y' = Just '.'
                         | otherwise = chrFromStuffs ss coords'
-                    chrFromStuffs ((OpaqueFlame (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                    chrFromStuffs (OpaqueFlame (Coords (x', y')):ss) coords'@(Coords (x, y))
                         | x == x' && y == y' = Just '~'
                         | otherwise = chrFromStuffs ss coords'
-                    chrFromStuffs ((OpaqueFlamePowerup (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                    chrFromStuffs (OpaqueFlamePowerup (Coords (x', y')):ss) coords'@(Coords (x, y))
                         | x == x' && y == y' = Just 'f'
                         | otherwise = chrFromStuffs ss coords'
-                    chrFromStuffs ((OpaqueBombPowerup (Coords (x', y')):ss)) coords'@(Coords (x, y))
+                    chrFromStuffs (OpaqueBombPowerup (Coords (x', y')):ss) coords'@(Coords (x, y))
                         | x == x' && y == y' = Just 'b'
                         | otherwise = chrFromStuffs ss coords'
 
                     chrFromBombs :: [OpaqueBomb] -> Coords -> Maybe Char
                     chrFromBombs [] _ = Nothing
-                    chrFromBombs ((OpaqueBomb (Coords (x', y'))):bs) coords'@(Coords (x, y))
+                    chrFromBombs (OpaqueBomb (Coords (x', y')):bs) coords'@(Coords (x, y))
                         | x == x' && y == y' = Just 'x'
                         | otherwise = chrFromBombs bs coords'
 
                     chrFromPlayers :: Int -> [OpaquePlayer] -> Coords -> Maybe Char
                     chrFromPlayers _ [] _ = Nothing
                     chrFromPlayers i (OpaqueDisconnectedPlayer:ps) coords' = chrFromPlayers (i + 1) ps coords'
-                    chrFromPlayers i ((OpaqueConnectedPlayer (Coords (x', y'))):ps) coords'@(Coords (x, y))
-                        | x == x' && y == y' = Just ((show i) !! 0)
+                    chrFromPlayers i (OpaqueConnectedPlayer (Coords (x', y')):ps) coords'@(Coords (x, y))
+                        | x == x' && y == y' = Just (head (show i))
                         | otherwise = chrFromPlayers (i + 1) ps coords'
 
 data OpaquePlayer
@@ -239,7 +239,7 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
         convert :: Coords -> [Player] -> [[Tile]]
                 -> ([[Cell]], [PlayerSlot], [Stuff])
         convert _ _ [] = ([], [], [])
-        convert coords@(Coords (x, y)) ps (tr:trs) = 
+        convert coords@(Coords (x, y)) ps (tr:trs) =
             ( el1_4 convertedRow  : el1_3 recurse
             , el2_4 convertedRow ++ el2_3 recurse
             , el3_4 convertedRow ++ el3_3 recurse
@@ -287,7 +287,7 @@ queueAction player action (State board playerSlots stuffs bombs)
         replacePlayerAction (DisconnectedPlayer : ss) = DisconnectedPlayer : replacePlayerAction ss
         replacePlayerAction (ConnectedPlayer a p c : ss)
             | p == player = ConnectedPlayer action p c : replacePlayerAction ss
-            | otherwise = ConnectedPlayer a p c : replacePlayerAction ss
+            | otherwise   = ConnectedPlayer a p c : replacePlayerAction ss
 
 tick :: State -> State
 tick s = s
