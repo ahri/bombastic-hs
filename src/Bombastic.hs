@@ -310,9 +310,9 @@ tick (State board playerSlots stuffs bombs) =
 
         move :: PlayerSlot -> Coords -> PlayerSlot
         move dp@DisconnectedPlayer _ = dp
-        move cp@(ConnectedPlayer a p _) coords
-            | indestructibleBlockAt board coords = cp
-            | destructibleBlockAt coords = cp
+        move (ConnectedPlayer a p c) coords
+            | indestructibleBlockAt board coords = ConnectedPlayer NoAction p c
+            | destructibleBlockAt coords = ConnectedPlayer NoAction p c
             | otherwise = ConnectedPlayer a p coords
 
         indestructibleBlockAt :: Board -> Coords -> Bool

@@ -127,34 +127,35 @@ main = hspec $ do
                     , "..."
                     ]
 
-                -- TODO: destructible blocks
-
                 doesntMoveWhenTicked action state =
                     (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
 
+                movesWhenTicked action state expectation = do
+                    let
+                        opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
+                        opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
+
+                        stateWithNextActionQueued = queueAction player action <$> state
+                        stateAfterTick = tick <$> stateWithNextActionQueued
+
+                    opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
+                            [ "#####"
+                            , "#   #"
+                            , "# 0 #"
+                            , "#   #"
+                            , "#####"
+                            ])
+
+                    opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $ expectation)
+
             it "up" $ do
-                let
-                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
-                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
-
-                    stateWithNextActionQueued = queueAction player MoveUp <$> initialMoveState
-                    stateAfterTick = tick <$> stateWithNextActionQueued
-
-                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "#   #"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#####"
-                        ])
-
-                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                movesWhenTicked MoveUp initialMoveState 
                         [ "#####"
                         , "# 0 #"
                         , "#   #"
                         , "#   #"
                         , "#####"
-                        ])
+                        ]
 
             it "up against indestructible block" $ do
                 doesntMoveWhenTicked MoveUp initialIndestructibleBlockState
@@ -163,28 +164,13 @@ main = hspec $ do
                 doesntMoveWhenTicked MoveUp initialDestructibleBlockState
 
             it "down" $ do
-                let
-                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
-                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
-
-                    stateWithNextActionQueued = queueAction player MoveDown <$> initialMoveState
-                    stateAfterTick = tick <$> stateWithNextActionQueued
-
-                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "#   #"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#####"
-                        ])
-
-                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                movesWhenTicked MoveDown initialMoveState 
                         [ "#####"
                         , "#   #"
                         , "#   #"
                         , "# 0 #"
                         , "#####"
-                        ])
+                        ]
 
             it "down against indestructible block" $ do
                 doesntMoveWhenTicked MoveDown initialIndestructibleBlockState
@@ -193,28 +179,13 @@ main = hspec $ do
                 doesntMoveWhenTicked MoveDown initialDestructibleBlockState
 
             it "left" $ do
-                let
-                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
-                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
-
-                    stateWithNextActionQueued = queueAction player MoveLeft <$> initialMoveState
-                    stateAfterTick = tick <$> stateWithNextActionQueued
-
-                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "#   #"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#####"
-                        ])
-
-                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                movesWhenTicked MoveLeft initialMoveState 
                         [ "#####"
                         , "#   #"
                         , "#0  #"
                         , "#   #"
                         , "#####"
-                        ])
+                        ]
 
             it "left against indestructible block" $ do
                 doesntMoveWhenTicked MoveLeft initialIndestructibleBlockState
@@ -223,28 +194,13 @@ main = hspec $ do
                 doesntMoveWhenTicked MoveLeft initialDestructibleBlockState
 
             it "right" $ do
-                let
-                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
-                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
-
-                    stateWithNextActionQueued = queueAction player MoveRight <$> initialMoveState
-                    stateAfterTick = tick <$> stateWithNextActionQueued
-
-                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "#   #"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#####"
-                        ])
-
-                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                movesWhenTicked MoveRight initialMoveState 
                         [ "#####"
                         , "#   #"
                         , "#  0#"
                         , "#   #"
                         , "#####"
-                        ])
+                        ]
 
             it "right against indestructible block" $ do
                 doesntMoveWhenTicked MoveRight initialIndestructibleBlockState
