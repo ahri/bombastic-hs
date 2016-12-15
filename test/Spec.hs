@@ -61,7 +61,7 @@ main = hspec $ do
                 ]
 
         it "player number is correct" $ do
-            let 
+            let
                 opaque = opaqueify . startGame players <$> mapFromDebug
                     [ "SS"
                     , "S "
@@ -95,33 +95,50 @@ main = hspec $ do
             tick <$> state `shouldBe` state
 
         context "movement" $ do
+            let
+                initialMoveState = startGame players <$>
+                    mapFromDebug moveMap
+
+                initialIndestructibleBlockState = startGame players <$>
+                    mapFromDebug indestructibleBlockMap
+
+                initialDestructibleBlockState = startGame players <$>
+                    mapFromDebug destructibleBlockMap
+
+                players = [player]
+                player = mkPlayer "p1"
+                moveMap =
+                    [ "#####"
+                    , "#   #"
+                    , "# S #"
+                    , "#   #"
+                    , "#####"
+                    ]
+
+                indestructibleBlockMap =
+                    [ "###"
+                    , "#S#"
+                    , "###"
+                    ]
+
+                destructibleBlockMap =
+                    [ "..."
+                    , ".S."
+                    , "..."
+                    ]
+
+                -- TODO: destructible blocks
+
+                doesntMoveWhenTicked action state =
+                    (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
+
             it "up" $ do
                 let
-                    opaqueInitialState = show . opaqueify <$> initialState
                     opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
-                    -- opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
+                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
 
-                    initialState = startGame players <$> mapFromDebug testMap
-                    stateWithNextActionQueued = queueAction player MoveUp <$> initialState
-                    -- stateAfterTick = tick <$> stateWithNextActionQueued
-
-                    players = [player]
-                    player = mkPlayer "p1"
-                    testMap =
-                        [ "#####"
-                        , "#   #"
-                        , "# S #"
-                        , "#   #"
-                        , "#####"
-                        ]
-
-                opaqueInitialState `shouldBe` (Just . intercalate "\n" $
-                        [ "#####"
-                        , "#   #"
-                        , "# 0 #"
-                        , "#   #"
-                        , "#####"
-                        ])
+                    stateWithNextActionQueued = queueAction player MoveUp <$> initialMoveState
+                    stateAfterTick = tick <$> stateWithNextActionQueued
 
                 opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
                         [ "#####"
@@ -131,11 +148,106 @@ main = hspec $ do
                         , "#####"
                         ])
 
-                pendingWith "implement tick!"
-                -- opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
-                --         [ "#####"
-                --         , "# 0 #"
-                --         , "#   #"
-                --         , "#   #"
-                --         , "#####"
-                --         ])
+                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "# 0 #"
+                        , "#   #"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+            it "up against indestructible block" $ do
+                doesntMoveWhenTicked MoveUp initialIndestructibleBlockState
+
+            it "up against destructible block" $ do
+                doesntMoveWhenTicked MoveUp initialDestructibleBlockState
+
+            it "down" $ do
+                let
+                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
+                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
+
+                    stateWithNextActionQueued = queueAction player MoveDown <$> initialMoveState
+                    stateAfterTick = tick <$> stateWithNextActionQueued
+
+                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "# 0 #"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "#   #"
+                        , "# 0 #"
+                        , "#####"
+                        ])
+
+            it "down against indestructible block" $ do
+                doesntMoveWhenTicked MoveDown initialIndestructibleBlockState
+
+            it "down against destructible block" $ do
+                doesntMoveWhenTicked MoveDown initialDestructibleBlockState
+
+            it "left" $ do
+                let
+                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
+                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
+
+                    stateWithNextActionQueued = queueAction player MoveLeft <$> initialMoveState
+                    stateAfterTick = tick <$> stateWithNextActionQueued
+
+                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "# 0 #"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "#0  #"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+            it "left against indestructible block" $ do
+                doesntMoveWhenTicked MoveLeft initialIndestructibleBlockState
+
+            it "left against destructible block" $ do
+                doesntMoveWhenTicked MoveLeft initialDestructibleBlockState
+
+            it "right" $ do
+                let
+                    opaqueStateWithNextActionQueued = show . opaqueify <$> stateWithNextActionQueued
+                    opaqueStateAfterTick = show . opaqueify <$> stateAfterTick
+
+                    stateWithNextActionQueued = queueAction player MoveRight <$> initialMoveState
+                    stateAfterTick = tick <$> stateWithNextActionQueued
+
+                opaqueStateWithNextActionQueued `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "# 0 #"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+                opaqueStateAfterTick `shouldBe` (Just . intercalate "\n" $
+                        [ "#####"
+                        , "#   #"
+                        , "#  0#"
+                        , "#   #"
+                        , "#####"
+                        ])
+
+            it "right against indestructible block" $ do
+                doesntMoveWhenTicked MoveRight initialIndestructibleBlockState
+
+            it "right against destructible block" $ do
+                doesntMoveWhenTicked MoveRight initialDestructibleBlockState

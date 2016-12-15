@@ -75,9 +75,9 @@ data Cell
 
 data Player = Player
     PlayerName
-    Score
-    BombCount
-    FlameCount
+    Score      -- TODO: move to PlayerSlot
+    BombCount  -- TODO: move to PlayerSlot
+    FlameCount -- TODO: move to PlayerSlot
     deriving (Eq, Show)
 
 newtype PlayerName = PlayerName String deriving (Eq, Show)
@@ -290,4 +290,38 @@ queueAction player action (State board playerSlots stuffs bombs)
             | otherwise   = ConnectedPlayer a p c : replacePlayerAction ss
 
 tick :: State -> State
-tick s = s
+tick (State board playerSlots stuffs bombs) =
+        State
+            board
+            (processPlayerSlot <$> playerSlots)
+            stuffs
+            bombs
+    where
+        processPlayerSlot dp@DisconnectedPlayer = dp
+
+        processPlayerSlot cp@(ConnectedPlayer NoAction _ _) = cp
+        processPlayerSlot cp@(ConnectedPlayer DropBomb _ _) = cp -- TODO: implement
+        processPlayerSlot cp@(ConnectedPlayer QuitGame _ _) = cp -- TODO: implement
+
+        processPlayerSlot cp@(ConnectedPlayer MoveUp _ (Coords (x, y)))    = move cp (Coords (x, y-1))
+        processPlayerSlot cp@(ConnectedPlayer MoveDown _ (Coords (x, y)))  = move cp (Coords (x, y+1))
+        processPlayerSlot cp@(ConnectedPlayer MoveLeft _ (Coords (x, y)))  = move cp (Coords (x-1, y))
+        processPlayerSlot cp@(ConnectedPlayer MoveRight _ (Coords (x, y))) = move cp (Coords (x+1, y))
+
+        move :: PlayerSlot -> Coords -> PlayerSlot
+        move dp@DisconnectedPlayer _ = dp
+        move cp@(ConnectedPlayer a p _) coords
+            | indestructibleBlockAt board coords = cp
+            | destructibleBlockAt coords = cp
+            | otherwise = ConnectedPlayer a p coords
+
+        indestructibleBlockAt :: Board -> Coords -> Bool
+        indestructibleBlockAt (Board cells2d) (Coords (x, y)) =
+            ((cells2d !! y) !! x) == IndestructibleBlock
+
+        destructibleBlockAt :: Coords -> Bool
+        destructibleBlockAt coords = any search stuffs
+            where
+                search :: Stuff -> Bool
+                search (DestructibleBlock coords') = coords == coords'
+                search _ = False
