@@ -32,7 +32,7 @@ main = hspec $ do
             let
                 opaque = show . opaqueify <$> state
                 state = startGame players <$> mapFromDebug validMap
-                players = [mkPlayer "p1", mkPlayer "p2"]
+                players = [PlayerName "p1", PlayerName "p2"]
 
                 expected = Just . intercalate "\n" $
                     [ "###################"
@@ -67,8 +67,8 @@ main = hspec $ do
                     , "S "
                     ]
                 players =
-                    [ mkPlayer "p1"
-                    , mkPlayer "p2"
+                    [ PlayerName "p1"
+                    , PlayerName "p2"
                     ]
                 getPlayers (OpaqueState _ ps _ _) = ps
 
@@ -82,7 +82,7 @@ main = hspec $ do
             let
                 opaque = show . opaqueify <$> state
                 state = startGame players <$> mapFromDebug invalidMap
-                players = [mkPlayer "p1", mkPlayer "p2"]
+                players = [PlayerName "p1", PlayerName "p2"]
 
             opaque `shouldBe` Nothing
 
@@ -90,7 +90,7 @@ main = hspec $ do
         it "no-op returns same state" $ do
             let
                 state = startGame players <$> mapFromDebug validMap
-                players = [mkPlayer "p1", mkPlayer "p2"]
+                players = [PlayerName "p1", PlayerName "p2"]
 
             tick <$> state `shouldBe` state
 
@@ -106,7 +106,7 @@ main = hspec $ do
                     mapFromDebug destructibleBlockMap
 
                 players = [player]
-                player = mkPlayer "p1"
+                player = PlayerName "p1"
                 moveMap =
                     [ "#####"
                     , "#   #"
@@ -207,3 +207,14 @@ main = hspec $ do
 
             it "right against destructible block" $ do
                 doesntMoveWhenTicked MoveRight initialDestructibleBlockState
+
+
+-- data PlayerAction = PlayerAction Player Action
+-- data TickActions = TickAction [PlayerAction]
+-- type DebugMap = [String]
+-- 
+-- assertResult :: [Player] -> DebugMap -> [TickActions] -> DebugMap -> IO ()
+-- assertResult = undefined
+-- 
+-- assertAll :: [Player] -> DebugMap -> [TickActions] -> [DebugMap] -> IO ()
+-- assertResult = undefined

@@ -1,6 +1,6 @@
 module Bombastic
     ( mapFromDebug
-    , mkPlayer
+    , PlayerName (..)
     , startGame
     , tick
 
@@ -34,19 +34,22 @@ data Tile
 
 data State = State
     Board
-    [PlayerSlot]
+    [Player]
     [Stuff]
     [Bomb]
     deriving (Eq, Show)
 
 newtype Board = Board [[Cell]] deriving (Eq, Show)
 
-data PlayerSlot
+data Player
     = DisconnectedPlayer
     | ConnectedPlayer
-        Action
-        Player
+        PlayerName
+        Score
+        BombCount
+        FlameCount
         Coords
+        Action
     deriving (Eq, Show)
 
 data Stuff
@@ -73,17 +76,7 @@ data Cell
     | IndestructibleBlock
     deriving (Eq, Show)
 
-data Player = Player
-    PlayerName
-    Score      -- TODO: move to PlayerSlot
-    BombCount  -- TODO: move to PlayerSlot
-    FlameCount -- TODO: move to PlayerSlot
-    deriving (Eq, Show)
-
 newtype PlayerName = PlayerName String deriving (Eq, Show)
-
-mkPlayer :: String -> Player
-mkPlayer name = Player (PlayerName name) (Score 0) (BombCount 1) (FlameCount 1)
 
 data Bomb = Bomb
     Coords
@@ -183,15 +176,15 @@ data OpaqueStuff
 data OpaqueBomb = OpaqueBomb Coords deriving (Eq, Show)
 
 opaqueify :: State -> OpaqueState
-opaqueify (State board playerSlots stuffs bombs) = OpaqueState
+opaqueify (State board players stuffs bombs) = OpaqueState
     board
-    (opaqueifyPlayerSlot <$> playerSlots)
+    (opaqueifyPlayer <$> players)
     (opaqueifyStuff      <$> stuffs)
     (opaqueifyBomb       <$> bombs)
     where
-        opaqueifyPlayerSlot :: PlayerSlot -> OpaquePlayer
-        opaqueifyPlayerSlot DisconnectedPlayer      = OpaqueDisconnectedPlayer
-        opaqueifyPlayerSlot (ConnectedPlayer _ _ c) = OpaqueConnectedPlayer c
+        opaqueifyPlayer :: Player -> OpaquePlayer
+        opaqueifyPlayer DisconnectedPlayer      = OpaqueDisconnectedPlayer
+        opaqueifyPlayer (ConnectedPlayer _ _ _ _ c _) = OpaqueConnectedPlayer c
 
         opaqueifyStuff :: Stuff -> OpaqueStuff
         opaqueifyStuff (DestructibleBlock c) = OpaqueDestructibleBlock c
@@ -218,11 +211,11 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
 -- Game initialization
 
-startGame :: [Player] -> Map -> State
-startGame players (Map tiles2d) = State board playerSlots stuffs []
+startGame :: [PlayerName] -> Map -> State
+startGame playerNames (Map tiles2d) = State board players stuffs []
     where
         board = Board . el1_3 $ converted
-        playerSlots = el2_3 converted
+        players = el2_3 converted
         stuffs = el3_3 converted
 
         el1_3 (el, _, _) = el
@@ -234,10 +227,10 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
         el3_4 (_, _, el, _) = el
         el4_4 (_, _, _, el) = el
 
-        converted = convert (Coords (0, 0)) players tiles2d
+        converted = convert (Coords (0, 0)) playerNames tiles2d
 
-        convert :: Coords -> [Player] -> [[Tile]]
-                -> ([[Cell]], [PlayerSlot], [Stuff])
+        convert :: Coords -> [PlayerName] -> [[Tile]]
+                -> ([[Cell]], [Player], [Stuff])
         convert _ _ [] = ([], [], [])
         convert coords@(Coords (x, y)) ps (tr:trs) =
             ( el1_4 convertedRow  : el1_3 recurse
@@ -248,10 +241,10 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
                 recurse = convert (Coords (x, y + 1)) (el4_4 convertedRow) trs
                 convertedRow = convertRow coords ps tr
 
-        convertRow :: Coords -> [Player] -> [Tile]
-                   -> ([Cell], [PlayerSlot], [Stuff], [Player])
-        convertRow _ ps [] = ([], [], [], ps)
-        convertRow coords@(Coords (x, y)) ps (t:ts) =
+        convertRow :: Coords -> [PlayerName] -> [Tile]
+                   -> ([Cell], [Player], [Stuff], [PlayerName])
+        convertRow _ pns [] = ([], [], [], pns)
+        convertRow coords@(Coords (x, y)) pns (t:ts) =
             ( convertTile t      : el1_4 recurse
             , fst playerLoaded  ++ el2_4 recurse
             , addStuff t coords ++ el3_4 recurse
@@ -259,7 +252,7 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
             )
             where
                 recurse = convertRow (Coords (x + 1, y)) (snd playerLoaded) ts
-                playerLoaded = loadPlayer t coords ps
+                playerLoaded = loadPlayer t coords pns
 
         convertTile :: Tile -> Cell
         convertTile EmptyTile           = EmptyCell
@@ -267,10 +260,10 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
         convertTile PlayerStartPosition = EmptyCell
         convertTile DestructibleTile    = EmptyCell
 
-        loadPlayer :: Tile -> Coords -> [Player] -> ([PlayerSlot], [Player])
-        loadPlayer PlayerStartPosition coords (p:ps) =
-            ([ConnectedPlayer NoAction p coords], ps)
-        loadPlayer _ _ ps = ([], ps)
+        loadPlayer :: Tile -> Coords -> [PlayerName] -> ([Player], [PlayerName])
+        loadPlayer PlayerStartPosition coords (pn:pns) =
+            ([ConnectedPlayer pn (Score 0) (BombCount 1) (FlameCount 1) coords NoAction], pns)
+        loadPlayer _ _ pns = ([], pns)
 
         addStuff :: Tile -> Coords -> [Stuff]
         addStuff DestructibleTile coords = [DestructibleBlock coords]
@@ -278,42 +271,44 @@ startGame players (Map tiles2d) = State board playerSlots stuffs []
 
 -- Actions & transitions
 
-queueAction :: Player -> Action -> State -> State
-queueAction player action (State board playerSlots stuffs bombs)
-    = State board (replacePlayerAction playerSlots) stuffs bombs
+-- TODO: players need to be given a generated token with which to execute actions, obviously this must not be in their opaque representation
+-- currently the lookup is purely on player name...
+queueAction :: PlayerName -> Action -> State -> State
+queueAction playerName action (State board players stuffs bombs)
+    = State board (replacePlayerAction players) stuffs bombs
     where
-        replacePlayerAction :: [PlayerSlot] -> [PlayerSlot]
+        replacePlayerAction :: [Player] -> [Player]
         replacePlayerAction [] = []
-        replacePlayerAction (DisconnectedPlayer : ss) = DisconnectedPlayer : replacePlayerAction ss
-        replacePlayerAction (ConnectedPlayer a p c : ss)
-            | p == player = ConnectedPlayer action p c : replacePlayerAction ss
-            | otherwise   = ConnectedPlayer a p c : replacePlayerAction ss
+        replacePlayerAction (DisconnectedPlayer : ps) = DisconnectedPlayer : replacePlayerAction ps
+        replacePlayerAction (ConnectedPlayer pn s bc fc c a : ps)
+            | pn == playerName = ConnectedPlayer pn s bc fc c action : replacePlayerAction ps
+            | otherwise   = ConnectedPlayer pn s bc fc c a : replacePlayerAction ps
 
 tick :: State -> State
-tick (State board playerSlots stuffs bombs) =
+tick (State board players stuffs bombs) =
         State
             board
-            (processPlayerSlot <$> playerSlots)
+            (processPlayer <$> players)
             stuffs
             bombs
     where
-        processPlayerSlot dp@DisconnectedPlayer = dp
+        processPlayer dp@DisconnectedPlayer = dp
 
-        processPlayerSlot cp@(ConnectedPlayer NoAction _ _) = cp
-        processPlayerSlot cp@(ConnectedPlayer DropBomb _ _) = cp -- TODO: implement
-        processPlayerSlot cp@(ConnectedPlayer QuitGame _ _) = cp -- TODO: implement
+        processPlayer cp@(ConnectedPlayer _ _ _ _ _ NoAction) = cp
+        processPlayer cp@(ConnectedPlayer _ _ _ _ _ DropBomb) = cp -- TODO: implement
+        processPlayer cp@(ConnectedPlayer _ _ _ _ _ QuitGame) = cp -- TODO: implement
 
-        processPlayerSlot cp@(ConnectedPlayer MoveUp _ (Coords (x, y)))    = move cp (Coords (x, y-1))
-        processPlayerSlot cp@(ConnectedPlayer MoveDown _ (Coords (x, y)))  = move cp (Coords (x, y+1))
-        processPlayerSlot cp@(ConnectedPlayer MoveLeft _ (Coords (x, y)))  = move cp (Coords (x-1, y))
-        processPlayerSlot cp@(ConnectedPlayer MoveRight _ (Coords (x, y))) = move cp (Coords (x+1, y))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveUp)    = move cp (Coords (x, y-1))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveDown)  = move cp (Coords (x, y+1))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveLeft)  = move cp (Coords (x-1, y))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveRight) = move cp (Coords (x+1, y))
 
-        move :: PlayerSlot -> Coords -> PlayerSlot
+        move :: Player -> Coords -> Player
         move dp@DisconnectedPlayer _ = dp
-        move (ConnectedPlayer a p c) coords
-            | indestructibleBlockAt board coords = ConnectedPlayer NoAction p c
-            | destructibleBlockAt coords = ConnectedPlayer NoAction p c
-            | otherwise = ConnectedPlayer a p coords
+        move (ConnectedPlayer pn s bc fc c a) coords
+            | indestructibleBlockAt board coords = ConnectedPlayer pn s bc fc c NoAction
+            | destructibleBlockAt coords = ConnectedPlayer pn s bc fc c NoAction
+            | otherwise = ConnectedPlayer pn s bc fc coords a
 
         indestructibleBlockAt :: Board -> Coords -> Bool
         indestructibleBlockAt (Board cells2d) (Coords (x, y)) =
