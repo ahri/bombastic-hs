@@ -1,7 +1,9 @@
 module Bombastic
     ( mapFromDebug
+    , DebugMap
     , PlayerName (..)
     , startGame
+    , State
     , tick
 
     , queueAction
@@ -21,6 +23,7 @@ import Data.List
 -- Storage
 
 newtype Map = Map [[Tile]] deriving (Eq, Show)
+type DebugMap = [String]
 
 data Tile
     = EmptyTile
@@ -205,7 +208,7 @@ charToTile ' ' = Just EmptyTile
 charToTile 'S' = Just PlayerStartPosition
 charToTile  _  = Nothing
 
-mapFromDebug :: [String] -> Maybe Map
+mapFromDebug :: DebugMap -> Maybe Map
 mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
 
