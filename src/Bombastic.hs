@@ -19,6 +19,7 @@ module Bombastic
     ) where
 
 import Data.List
+import Data.Maybe
 
 -- Storage
 
@@ -67,9 +68,13 @@ newtype Coords = Coords (Int, Int) deriving (Eq, Show)
 data Action
     = NoAction
     | MoveUp
+    | MoveUpBomb
     | MoveDown
+    | MoveDownBomb
     | MoveLeft
+    | MoveLeftBomb
     | MoveRight
+    | MoveRightBomb
     | DropBomb
     | QuitGame
     deriving (Eq, Show)
@@ -154,7 +159,7 @@ instance Show OpaqueState where
                     chrFromBombs :: [OpaqueBomb] -> Coords -> Maybe Char
                     chrFromBombs [] _ = Nothing
                     chrFromBombs (OpaqueBomb (Coords (x', y')):bs) coords'@(Coords (x, y))
-                        | x == x' && y == y' = Just 'x'
+                        | x == x' && y == y' = Just 'Q'
                         | otherwise = chrFromBombs bs coords'
 
                     chrFromPlayers :: Int -> [OpaquePlayer] -> Coords -> Maybe Char
@@ -284,34 +289,74 @@ queueAction playerName action (State board players stuffs bombs)
         replacePlayerAction [] = []
         replacePlayerAction (DisconnectedPlayer : ps) = DisconnectedPlayer : replacePlayerAction ps
         replacePlayerAction (ConnectedPlayer pn s bc fc c a : ps)
-            | pn == playerName = ConnectedPlayer pn s bc fc c action : replacePlayerAction ps
+            | pn == playerName = ConnectedPlayer pn s bc fc c (combineActions a action) : replacePlayerAction ps
             | otherwise   = ConnectedPlayer pn s bc fc c a : replacePlayerAction ps
 
+        combineActions :: Action -> Action -> Action
+        combineActions MoveUp        DropBomb  = MoveLeftBomb
+        combineActions DropBomb      MoveUp    = MoveLeftBomb
+        combineActions MoveDown      DropBomb  = MoveDownBomb
+        combineActions DropBomb      MoveDown  = MoveDownBomb
+        combineActions MoveLeft      DropBomb  = MoveLeftBomb
+        combineActions DropBomb      MoveLeft  = MoveLeftBomb
+        combineActions MoveRight     DropBomb  = MoveRightBomb
+        combineActions DropBomb      MoveRight = MoveRightBomb
+        combineActions MoveUpBomb    MoveDown  = MoveDownBomb
+        combineActions MoveUpBomb    MoveLeft  = MoveLeftBomb
+        combineActions MoveUpBomb    MoveRight = MoveRightBomb
+        combineActions MoveUpBomb    DropBomb  = MoveUpBomb
+        combineActions MoveDownBomb  MoveUp    = MoveUpBomb
+        combineActions MoveDownBomb  MoveLeft  = MoveLeftBomb
+        combineActions MoveDownBomb  MoveRight = MoveRightBomb
+        combineActions MoveDownBomb  DropBomb  = MoveDownBomb
+        combineActions MoveLeftBomb  MoveUp    = MoveUpBomb
+        combineActions MoveLeftBomb  MoveDown  = MoveDownBomb
+        combineActions MoveLeftBomb  MoveRight = MoveRightBomb
+        combineActions MoveLeftBomb  DropBomb  = MoveLeftBomb
+        combineActions MoveRightBomb MoveUp    = MoveUpBomb
+        combineActions MoveRightBomb MoveDown  = MoveDownBomb
+        combineActions MoveRightBomb MoveLeft  = MoveLeftBomb
+        combineActions MoveRightBomb DropBomb  = MoveRightBomb
+        combineActions _ a = a
+
 tick :: State -> State
-tick (State board players stuffs bombs) =
+tick (State board players stuffs bombs) = -- TODO: maybe this should be a recursive algorithm, now it's getting more complicated
         State
             board
-            (processPlayer <$> players)
+            (fst . processPlayer <$> players)
             stuffs
-            bombs
+            (bombs ++ catMaybes (snd . processPlayer <$> players))
     where
-        processPlayer dp@DisconnectedPlayer = dp
+        processPlayer :: Player -> (Player, Maybe Bomb)
+        processPlayer dp@DisconnectedPlayer = (dp, Nothing)
 
-        processPlayer cp@(ConnectedPlayer _ _ _ _ _ NoAction) = cp
-        processPlayer cp@(ConnectedPlayer _ _ _ _ _ DropBomb) = cp -- TODO: implement
-        processPlayer cp@(ConnectedPlayer _ _ _ _ _ QuitGame) = cp -- TODO: implement
+        processPlayer cp@(ConnectedPlayer _ _ _ _ _ NoAction) = (cp, Nothing)
+        processPlayer cp@(ConnectedPlayer _ _ _ _ c DropBomb) = (cp, Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ _ QuitGame) = (cp, Nothing) -- TODO: implement
 
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveUp)    = move cp (Coords (x, y-1))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveDown)  = move cp (Coords (x, y+1))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveLeft)  = move cp (Coords (x-1, y))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveRight) = move cp (Coords (x+1, y))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveUp)          = (move cp (Coords (x, y-1)), Nothing)
+        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveUpBomb)    = (move cp (Coords (x, y-1)), Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveDown)        = (move cp (Coords (x, y+1)), Nothing)
+        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveDownBomb)  = (move cp (Coords (x, y+1)), Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveLeft)        = (move cp (Coords (x-1, y)), Nothing)
+        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveLeftBomb)  = (move cp (Coords (x-1, y)), Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveRight)       = (move cp (Coords (x+1, y)), Nothing)
+        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveRightBomb) = (move cp (Coords (x+1, y)), Just (Bomb c (BombTicksLeft 3) cp))
 
         move :: Player -> Coords -> Player
         move dp@DisconnectedPlayer _ = dp
         move (ConnectedPlayer pn s bc fc c a) coords
             | indestructibleBlockAt board coords = ConnectedPlayer pn s bc fc c NoAction
             | destructibleBlockAt coords = ConnectedPlayer pn s bc fc c NoAction
-            | otherwise = ConnectedPlayer pn s bc fc coords a
+            | bombAt coords = ConnectedPlayer pn s bc fc c NoAction
+            | otherwise = ConnectedPlayer pn s bc fc coords (reduceAction a)
+
+        reduceAction :: Action -> Action
+        reduceAction MoveUpBomb    = MoveUp
+        reduceAction MoveDownBomb  = MoveDown
+        reduceAction MoveLeftBomb  = MoveLeft
+        reduceAction MoveRightBomb = MoveRight
+        reduceAction a = a
 
         indestructibleBlockAt :: Board -> Coords -> Bool
         indestructibleBlockAt (Board cells2d) (Coords (x, y)) =
@@ -323,3 +368,9 @@ tick (State board players stuffs bombs) =
                 search :: Stuff -> Bool
                 search (DestructibleBlock coords') = coords == coords'
                 search _ = False
+
+        bombAt :: Coords -> Bool
+        bombAt coords = any search bombs
+            where
+                search :: Bomb -> Bool
+                search (Bomb coords' _ _) = coords == coords'

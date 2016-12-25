@@ -213,7 +213,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveRight]
+                    [ ( [Input player MoveLeft, Input player MoveRight]
                       , [ "#####"
                         , "#   #"
                         , "#  0#"
@@ -228,6 +228,236 @@ main = hspec $ do
 
             it "right against destructible block" $ do
                 doesntMoveWhenTicked MoveRight initialDestructibleBlockState
+
+            it "movement continues" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#0  #"
+                    , "#####"
+                    ]
+                    [ ( [Input player MoveRight]
+                      , [ "#####"
+                        , "# 0 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#  0#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+                
+
+        context "bombing" $ do
+            let
+                player = PlayerName "p1"
+                moveMap =
+                    [ "#####"
+                    , "#   #"
+                    , "# S #"
+                    , "#   #"
+                    , "#####"
+                    ]
+
+            it "a bomb is dropped" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 0 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "a bomb is dropped and movement occurs" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 0 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player DropBomb
+                        , Input player MoveRight
+                        ]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q0#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "movement occurs and a bomb is dropped" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 0 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q0#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "movement continues without bombs dropping" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#0  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q0 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#Q 0#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "change of mind in direction still drops bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "# S #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "# 0 #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        , Input player MoveLeft
+                        ]
+                      , [ "#####"
+                        , "#0Q #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "repeated bomb action doesn't change anything" $ do
+                assertSeries
+                    [ "#####"
+                    , "# S #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "# 0 #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "# Q0#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "player cannot move onto bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#0  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q0 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player MoveLeft]
+                      , [ "#####"
+                        , "#Q0 #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+        context "powerups" $ do
+            let
+                player = PlayerName "p1"
+
+            it "player cannot drop more than one bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#0  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player MoveRight
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q0 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#Q 0#"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
 
 assertSeries :: DebugMap -> [PlayerName] -> DebugMap -> [([Input], DebugMap)] -> IO ()
