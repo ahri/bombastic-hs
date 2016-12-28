@@ -7,6 +7,11 @@ task :build do
   verbose(false) { sh "stack build" }
 end
 
+desc "Interactive debug"
+task :ghci do
+  verbose(false) { sh "stack ghci bombastic:spec" }
+end
+
 desc "Run the program"
 task :run => :build do
   verbose(false) { sh "stack exec bombastic 2>&1" }

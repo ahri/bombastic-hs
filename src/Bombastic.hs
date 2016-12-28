@@ -87,9 +87,10 @@ data Cell
 newtype PlayerName = PlayerName String deriving (Eq, Show)
 
 data Bomb = Bomb
+    PlayerName
     Coords
     BombTicksLeft
-    Player
+    FlameCount
     deriving (Eq, Show)
 
 newtype Score = Score Integer deriving (Eq, Show)
@@ -201,7 +202,7 @@ opaqueify (State board players stuffs bombs) = OpaqueState
         opaqueifyStuff (BombPowerup c)       = OpaqueBombPowerup c
 
         opaqueifyBomb :: Bomb -> OpaqueBomb
-        opaqueifyBomb (Bomb c _ _) = OpaqueBomb c
+        opaqueifyBomb (Bomb _ c _ _) = OpaqueBomb c
 
 
 -- Map loading
@@ -331,25 +332,34 @@ tick (State board players stuffs bombs) = -- TODO: maybe this should be a recurs
         processPlayer dp@DisconnectedPlayer = (dp, Nothing)
 
         processPlayer cp@(ConnectedPlayer _ _ _ _ _ NoAction) = (cp, Nothing)
-        processPlayer cp@(ConnectedPlayer _ _ _ _ c DropBomb) = (cp, Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer (ConnectedPlayer n s bc fc c a@DropBomb) = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc c a, snd . dropBomb n c bc $ fc)
         processPlayer cp@(ConnectedPlayer _ _ _ _ _ QuitGame) = (cp, Nothing) -- TODO: implement
 
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveUp)          = (move cp (Coords (x, y-1)), Nothing)
-        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveUpBomb)    = (move cp (Coords (x, y-1)), Just (Bomb c (BombTicksLeft 3) cp))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveDown)        = (move cp (Coords (x, y+1)), Nothing)
-        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveDownBomb)  = (move cp (Coords (x, y+1)), Just (Bomb c (BombTicksLeft 3) cp))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveLeft)        = (move cp (Coords (x-1, y)), Nothing)
-        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveLeftBomb)  = (move cp (Coords (x-1, y)), Just (Bomb c (BombTicksLeft 3) cp))
-        processPlayer cp@(ConnectedPlayer _ _ _ _ (Coords (x, y)) MoveRight)       = (move cp (Coords (x+1, y)), Nothing)
-        processPlayer cp@(ConnectedPlayer _ _ _ _ c@(Coords (x, y)) MoveRightBomb) = (move cp (Coords (x+1, y)), Just (Bomb c (BombTicksLeft 3) cp))
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveUp)        = (ConnectedPlayer n s bc                           fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    Nothing)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveUpBomb)    = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    snd . dropBomb n c bc $ fc)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveDown)      = (ConnectedPlayer n s bc                           fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  Nothing)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveDownBomb)  = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  snd . dropBomb n c bc $ fc)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveLeft)      = (ConnectedPlayer n s bc                           fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  Nothing)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveLeftBomb)  = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  snd . dropBomb n c bc $ fc)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveRight)     = (ConnectedPlayer n s bc                           fc (fst . moveRight a $ c) (snd . moveRight a $ c), Nothing)
+        processPlayer (ConnectedPlayer n s bc fc c a@MoveRightBomb) = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveRight a $ c) (snd . moveRight a $ c), snd . dropBomb n c bc $ fc)
 
-        move :: Player -> Coords -> Player
-        move dp@DisconnectedPlayer _ = dp
-        move (ConnectedPlayer pn s bc fc c a) coords
-            | indestructibleBlockAt board coords = ConnectedPlayer pn s bc fc c NoAction
-            | destructibleBlockAt coords = ConnectedPlayer pn s bc fc c NoAction
-            | bombAt coords = ConnectedPlayer pn s bc fc c NoAction
-            | otherwise = ConnectedPlayer pn s bc fc coords (reduceAction a)
+        moveUp    a c@(Coords (x, y)) = move c a (Coords (x, y-1))
+        moveDown  a c@(Coords (x, y)) = move c a (Coords (x, y+1))
+        moveLeft  a c@(Coords (x, y)) = move c a (Coords (x-1, y))
+        moveRight a c@(Coords (x, y)) = move c a (Coords (x+1, y))
+
+        dropBomb :: PlayerName -> Coords -> BombCount -> FlameCount -> (BombCount, Maybe Bomb)
+        dropBomb n c bc@(BombCount i) fc
+            | i > 0 = (BombCount (i - 1), Just (Bomb n c (BombTicksLeft 3) fc))
+            | otherwise = (bc, Nothing)
+
+        move :: Coords -> Action -> Coords -> (Coords, Action)
+        move from action to
+            | indestructibleBlockAt board to = (from, NoAction)
+            | destructibleBlockAt to = (from, NoAction)
+            | bombAt to = (from, NoAction)
+            | otherwise = (to, reduceAction action)
 
         reduceAction :: Action -> Action
         reduceAction MoveUpBomb    = MoveUp
@@ -373,4 +383,4 @@ tick (State board players stuffs bombs) = -- TODO: maybe this should be a recurs
         bombAt coords = any search bombs
             where
                 search :: Bomb -> Bool
-                search (Bomb coords' _ _) = coords == coords'
+                search (Bomb _ coords' _ _) = coords == coords'
