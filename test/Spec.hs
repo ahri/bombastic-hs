@@ -464,6 +464,16 @@ main = hspec $ do
                       )
                     ]
 
+            --- TODO: i want to test that extra flame and bomb powerups affect
+            --        how long flame is, and how many bombs can be dropped, but
+            --        due to the randomness it feels like the only ways to
+            --        achieve this in a test are:
+            --          1. set a state via some hopefully-debug-only api
+            --          2. pick random seeds until one suits me, and use that to
+            --             ensure a specific powerup
+            --        - seems like (1) is more sensible... but also a bit risky.
+            --          maybe see if modules can help us expose only certain
+            --          functionality for test purposes? that'd be nice
 
 assertSeries :: DebugMap -> [Participant] -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names postSpawn expectations = do
