@@ -2,7 +2,7 @@ import Test.Hspec
 import Data.List
 import Bombastic
 
-data Input = Input PlayerName Action
+data Input = Input PlayerId Action
 
 validMap :: [String]
 validMap =
@@ -33,7 +33,7 @@ main = hspec $ do
         it "valid map loads correctly" $ do
             assertSeries
                 validMap
-                [PlayerName "p1", PlayerName "p2"]
+                [mkDebugPlayer 1 "p1", mkDebugPlayer 2 "p2"]
                 [ "###################"
                 , "#0 ..       .... 1#"
                 , "# # # # # # #.#.# #"
@@ -65,8 +65,8 @@ main = hspec $ do
                     , "S "
                     ]
                 players =
-                    [ PlayerName "p1"
-                    , PlayerName "p2"
+                    [ mkDebugPlayer 1 "p1"
+                    , mkDebugPlayer 2 "p2"
                     ]
                 getPlayers (OpaqueState _ ps _ _) = ps
 
@@ -80,7 +80,7 @@ main = hspec $ do
             let
                 opaque = show . opaqueify <$> state
                 state = startGame players <$> mapFromDebug invalidMap
-                players = [PlayerName "p1", PlayerName "p2"]
+                players = [mkDebugPlayer 1 "p1", mkDebugPlayer 2 "p2"]
 
             opaque `shouldBe` Nothing
 
@@ -88,7 +88,7 @@ main = hspec $ do
         it "no-op returns same state" $ do
             let
                 state = startGame players <$> mapFromDebug validMap
-                players = [PlayerName "p1", PlayerName "p2"]
+                players = [mkDebugPlayer 1 "p1", mkDebugPlayer 2 "p2"]
 
             tick <$> state `shouldBe` state
 
@@ -101,7 +101,9 @@ main = hspec $ do
                     mapFromDebug destructibleBlockMap
 
                 players = [player]
-                player = PlayerName "p1"
+                player = mkDebugPlayer 1 "p1"
+                pid = getPlayerId player
+
                 moveMap =
                     [ "#####"
                     , "#   #"
@@ -123,7 +125,7 @@ main = hspec $ do
                     ]
 
                 doesntMoveWhenTicked action state =
-                    (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
+                    (opaqueify . tick . queueAction pid action <$> state) `shouldBe` (opaqueify <$> state)
 
             it "up" $ do
                 assertSeries
@@ -135,7 +137,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveUp]
+                    [ ( [Input pid MoveUp]
                       , [ "#####"
                         , "# 0 #"
                         , "#   #"
@@ -161,7 +163,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveDown]
+                    [ ( [Input pid MoveDown]
                       , [ "#####"
                         , "#   #"
                         , "#   #"
@@ -187,7 +189,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveLeft]
+                    [ ( [Input pid MoveLeft]
                       , [ "#####"
                         , "#   #"
                         , "#0  #"
@@ -213,7 +215,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveLeft, Input player MoveRight]
+                    [ ( [Input pid MoveLeft, Input pid MoveRight]
                       , [ "#####"
                         , "#   #"
                         , "#  0#"
@@ -240,7 +242,7 @@ main = hspec $ do
                     , "#0  #"
                     , "#####"
                     ]
-                    [ ( [Input player MoveRight]
+                    [ ( [Input pid MoveRight]
                       , [ "#####"
                         , "# 0 #"
                         , "#####"
@@ -257,7 +259,9 @@ main = hspec $ do
 
         context "bombing" $ do
             let
-                player = PlayerName "p1"
+                player = mkDebugPlayer 1 "p1"
+                pid = getPlayerId player
+
                 moveMap =
                     [ "#####"
                     , "#   #"
@@ -276,7 +280,7 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [Input player DropBomb]
+                    [ ( [Input pid DropBomb]
                       , [ "#####"
                         , "#   #"
                         , "# Q #"
@@ -296,8 +300,8 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [ Input player DropBomb
-                        , Input player MoveRight
+                    [ ( [ Input pid DropBomb
+                        , Input pid MoveRight
                         ]
                       , [ "#####"
                         , "#   #"
@@ -318,8 +322,8 @@ main = hspec $ do
                     , "#   #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
                         ]
                       , [ "#####"
                         , "#   #"
@@ -341,8 +345,8 @@ main = hspec $ do
                     , "#0  #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
                         ]
                       , [ "#####"
                         , "#Q0 #"
@@ -368,9 +372,9 @@ main = hspec $ do
                     , "# 0 #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
-                        , Input player MoveLeft
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
+                        , Input pid MoveLeft
                         ]
                       , [ "#####"
                         , "#0Q #"
@@ -390,9 +394,9 @@ main = hspec $ do
                     , "# 0 #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
-                        , Input player DropBomb
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
+                        , Input pid DropBomb
                         ]
                       , [ "#####"
                         , "# Q0#"
@@ -412,15 +416,15 @@ main = hspec $ do
                     , "#0  #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
                         ]
                       , [ "#####"
                         , "#Q0 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player MoveLeft]
+                    , ( [Input pid MoveLeft]
                       , [ "#####"
                         , "#Q0 #"
                         , "#####"
@@ -430,7 +434,8 @@ main = hspec $ do
 
         context "powerups" $ do
             let
-                player = PlayerName "p1"
+                player = mkDebugPlayer 1 "p1"
+                pid = getPlayerId player
 
             it "player cannot drop more than one bomb" $ do
                 assertSeries
@@ -443,15 +448,15 @@ main = hspec $ do
                     , "#0  #"
                     , "#####"
                     ]
-                    [ ( [ Input player MoveRight
-                        , Input player DropBomb
+                    [ ( [ Input pid MoveRight
+                        , Input pid DropBomb
                         ]
                       , [ "#####"
                         , "#Q0 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input pid DropBomb]
                       , [ "#####"
                         , "#Q 0#"
                         , "#####"
@@ -460,7 +465,7 @@ main = hspec $ do
                     ]
 
 
-assertSeries :: DebugMap -> [PlayerName] -> DebugMap -> [([Input], DebugMap)] -> IO ()
+assertSeries :: DebugMap -> [Participant] -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names postSpawn expectations = do
     let
         queueAllInputs :: [Input] -> State -> State

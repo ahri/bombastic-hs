@@ -16,7 +16,7 @@ main = do
     let
         getPlayers (OpaqueState _ players _ _) = players
         oState = opaqueify <$> state
-        state = startGame [PlayerName "p1", PlayerName "p2"]
+        state = startGame [mkDebugPlayer 1 "p1", mkDebugPlayer 2 "p2"]
             <$> mapFromDebug exampleDebugMap
 
     putStrLn ""

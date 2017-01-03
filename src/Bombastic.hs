@@ -1,7 +1,10 @@
 module Bombastic
     ( mapFromDebug
     , DebugMap
-    , PlayerName (..)
+    , Participant
+    , mkDebugPlayer
+    , getPlayerId
+    , PlayerId
     , startGame
     , State
     , tick
@@ -48,13 +51,24 @@ newtype Board = Board [[Cell]] deriving (Eq, Show)
 data Player
     = DisconnectedPlayer
     | ConnectedPlayer
-        PlayerName
+        Participant
         Score
         BombCount
         FlameCount
         Coords
         Action
     deriving (Eq, Show)
+
+data Participant = Participant PlayerId PlayerName deriving (Eq, Show)
+
+mkDebugPlayer :: Int -> String -> Participant
+mkDebugPlayer pid name = Participant (PlayerId pid) (PlayerName name)
+
+getPlayerId :: Participant -> PlayerId
+getPlayerId (Participant pid _) = pid
+
+newtype PlayerId = PlayerId Int deriving (Eq, Show)
+newtype PlayerName = PlayerName String deriving (Eq, Show)
 
 data Stuff
     = DestructibleBlock Coords
@@ -84,10 +98,8 @@ data Cell
     | IndestructibleBlock
     deriving (Eq, Show)
 
-newtype PlayerName = PlayerName String deriving (Eq, Show)
-
 data Bomb = Bomb
-    PlayerName
+    PlayerId
     Coords
     BombTicksLeft
     FlameCount
@@ -220,8 +232,8 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
 -- Game initialization
 
-startGame :: [PlayerName] -> Map -> State
-startGame playerNames (Map tiles2d) = State board players stuffs []
+startGame :: [Participant] -> Map -> State
+startGame participants (Map tiles2d) = State board players stuffs []
     where
         board = Board . el1_3 $ converted
         players = el2_3 converted
@@ -236,9 +248,9 @@ startGame playerNames (Map tiles2d) = State board players stuffs []
         el3_4 (_, _, el, _) = el
         el4_4 (_, _, _, el) = el
 
-        converted = convert (Coords (0, 0)) playerNames tiles2d
+        converted = convert (Coords (0, 0)) participants tiles2d
 
-        convert :: Coords -> [PlayerName] -> [[Tile]]
+        convert :: Coords -> [Participant] -> [[Tile]]
                 -> ([[Cell]], [Player], [Stuff])
         convert _ _ [] = ([], [], [])
         convert coords@(Coords (x, y)) ps (tr:trs) =
@@ -250,10 +262,10 @@ startGame playerNames (Map tiles2d) = State board players stuffs []
                 recurse = convert (Coords (x, y + 1)) (el4_4 convertedRow) trs
                 convertedRow = convertRow coords ps tr
 
-        convertRow :: Coords -> [PlayerName] -> [Tile]
-                   -> ([Cell], [Player], [Stuff], [PlayerName])
-        convertRow _ pns [] = ([], [], [], pns)
-        convertRow coords@(Coords (x, y)) pns (t:ts) =
+        convertRow :: Coords -> [Participant] -> [Tile]
+                   -> ([Cell], [Player], [Stuff], [Participant])
+        convertRow _ ps [] = ([], [], [], ps)
+        convertRow coords@(Coords (x, y)) ps (t:ts) =
             ( convertTile t      : el1_4 recurse
             , fst playerLoaded  ++ el2_4 recurse
             , addStuff t coords ++ el3_4 recurse
@@ -261,7 +273,7 @@ startGame playerNames (Map tiles2d) = State board players stuffs []
             )
             where
                 recurse = convertRow (Coords (x + 1, y)) (snd playerLoaded) ts
-                playerLoaded = loadPlayer t coords pns
+                playerLoaded = loadPlayer t coords ps
 
         convertTile :: Tile -> Cell
         convertTile EmptyTile           = EmptyCell
@@ -269,10 +281,10 @@ startGame playerNames (Map tiles2d) = State board players stuffs []
         convertTile PlayerStartPosition = EmptyCell
         convertTile DestructibleTile    = EmptyCell
 
-        loadPlayer :: Tile -> Coords -> [PlayerName] -> ([Player], [PlayerName])
-        loadPlayer PlayerStartPosition coords (pn:pns) =
-            ([ConnectedPlayer pn (Score 0) (BombCount 1) (FlameCount 1) coords NoAction], pns)
-        loadPlayer _ _ pns = ([], pns)
+        loadPlayer :: Tile -> Coords -> [Participant] -> ([Player], [Participant])
+        loadPlayer PlayerStartPosition coords (p:ps) =
+            ([ConnectedPlayer p (Score 0) (BombCount 1) (FlameCount 1) coords NoAction], ps)
+        loadPlayer _ _ ps = ([], ps)
 
         addStuff :: Tile -> Coords -> [Stuff]
         addStuff DestructibleTile coords = [DestructibleBlock coords]
@@ -280,18 +292,16 @@ startGame playerNames (Map tiles2d) = State board players stuffs []
 
 -- Actions & transitions
 
--- TODO: players need to be given a generated token with which to execute actions, obviously this must not be in their opaque representation
--- currently the lookup is purely on player name...
-queueAction :: PlayerName -> Action -> State -> State
-queueAction playerName action (State board players stuffs bombs)
+queueAction :: PlayerId -> Action -> State -> State
+queueAction playerId action (State board players stuffs bombs)
     = State board (replacePlayerAction players) stuffs bombs
     where
         replacePlayerAction :: [Player] -> [Player]
         replacePlayerAction [] = []
         replacePlayerAction (DisconnectedPlayer : ps) = DisconnectedPlayer : replacePlayerAction ps
-        replacePlayerAction (ConnectedPlayer pn s bc fc c a : ps)
-            | pn == playerName = ConnectedPlayer pn s bc fc c (combineActions a action) : replacePlayerAction ps
-            | otherwise   = ConnectedPlayer pn s bc fc c a : replacePlayerAction ps
+        replacePlayerAction (ConnectedPlayer p@(Participant pid _) s bc fc c a : ps)
+            | pid == playerId = ConnectedPlayer p s bc fc c (combineActions a action) : replacePlayerAction ps
+            | otherwise   = ConnectedPlayer p s bc fc c a : replacePlayerAction ps
 
         combineActions :: Action -> Action -> Action
         combineActions MoveUp        DropBomb  = MoveLeftBomb
@@ -332,26 +342,26 @@ tick (State board players stuffs bombs) = -- TODO: maybe this should be a recurs
         processPlayer dp@DisconnectedPlayer = (dp, Nothing)
 
         processPlayer cp@(ConnectedPlayer _ _ _ _ _ NoAction) = (cp, Nothing)
-        processPlayer (ConnectedPlayer n s bc fc c a@DropBomb) = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc c a, snd . dropBomb n c bc $ fc)
+        processPlayer (ConnectedPlayer p s bc fc c a@DropBomb) = (ConnectedPlayer p s (fst . dropBomb p c bc $ fc) fc c a, snd . dropBomb p c bc $ fc)
         processPlayer cp@(ConnectedPlayer _ _ _ _ _ QuitGame) = (cp, Nothing) -- TODO: implement
 
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveUp)        = (ConnectedPlayer n s bc                           fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    Nothing)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveUpBomb)    = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    snd . dropBomb n c bc $ fc)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveDown)      = (ConnectedPlayer n s bc                           fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  Nothing)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveDownBomb)  = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  snd . dropBomb n c bc $ fc)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveLeft)      = (ConnectedPlayer n s bc                           fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  Nothing)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveLeftBomb)  = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  snd . dropBomb n c bc $ fc)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveRight)     = (ConnectedPlayer n s bc                           fc (fst . moveRight a $ c) (snd . moveRight a $ c), Nothing)
-        processPlayer (ConnectedPlayer n s bc fc c a@MoveRightBomb) = (ConnectedPlayer n s (fst . dropBomb n c bc $ fc) fc (fst . moveRight a $ c) (snd . moveRight a $ c), snd . dropBomb n c bc $ fc)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveUp)        = (ConnectedPlayer p s bc                           fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    Nothing)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveUpBomb)    = (ConnectedPlayer p s (fst . dropBomb p c bc $ fc) fc (fst . moveUp a $ c)    (snd . moveUp a $ c),    snd . dropBomb p c bc $ fc)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveDown)      = (ConnectedPlayer p s bc                           fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  Nothing)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveDownBomb)  = (ConnectedPlayer p s (fst . dropBomb p c bc $ fc) fc (fst . moveDown a $ c)  (snd . moveDown a $ c),  snd . dropBomb p c bc $ fc)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveLeft)      = (ConnectedPlayer p s bc                           fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  Nothing)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveLeftBomb)  = (ConnectedPlayer p s (fst . dropBomb p c bc $ fc) fc (fst . moveLeft a $ c)  (snd . moveLeft a $ c),  snd . dropBomb p c bc $ fc)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveRight)     = (ConnectedPlayer p s bc                           fc (fst . moveRight a $ c) (snd . moveRight a $ c), Nothing)
+        processPlayer (ConnectedPlayer p s bc fc c a@MoveRightBomb) = (ConnectedPlayer p s (fst . dropBomb p c bc $ fc) fc (fst . moveRight a $ c) (snd . moveRight a $ c), snd . dropBomb p c bc $ fc)
 
         moveUp    a c@(Coords (x, y)) = move c a (Coords (x, y-1))
         moveDown  a c@(Coords (x, y)) = move c a (Coords (x, y+1))
         moveLeft  a c@(Coords (x, y)) = move c a (Coords (x-1, y))
         moveRight a c@(Coords (x, y)) = move c a (Coords (x+1, y))
 
-        dropBomb :: PlayerName -> Coords -> BombCount -> FlameCount -> (BombCount, Maybe Bomb)
-        dropBomb n c bc@(BombCount i) fc
-            | i > 0 = (BombCount (i - 1), Just (Bomb n c (BombTicksLeft 3) fc))
+        dropBomb :: Participant -> Coords -> BombCount -> FlameCount -> (BombCount, Maybe Bomb)
+        dropBomb (Participant pid _) c bc@(BombCount i) fc
+            | i > 0 = (BombCount (i - 1), Just (Bomb pid c (BombTicksLeft 3) fc))
             | otherwise = (bc, Nothing)
 
         move :: Coords -> Action -> Coords -> (Coords, Action)
