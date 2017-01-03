@@ -432,6 +432,60 @@ main = hspec $ do
                       )
                     ]
 
+        context "flame" $ do
+            let
+                player = mkDebugPlayer 1 "p1"
+                pid = getPlayerId player
+
+            it "basic bomb detonates after 3 ticks" $ do
+                assertSeries
+                    [ "#####"
+                    , "#   #"
+                    , "# S #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 0 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input pid DropBomb]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# ~ #"
+                        , "#~~~#"
+                        , "# ~ #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
         context "powerups" $ do
             let
                 player = mkDebugPlayer 1 "p1"
