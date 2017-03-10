@@ -8,6 +8,7 @@ module Bombastic
     , startGame
     , State
     , tick
+    -- , tick2
 
     , queueAction
     , Action (..)
@@ -23,6 +24,7 @@ module Bombastic
 
 import Data.List
 import Data.Maybe
+import Data.Monoid
 
 -- Storage
 
@@ -72,12 +74,16 @@ newtype PlayerName = PlayerName String deriving (Eq, Show)
 
 data Stuff
     = DestructibleBlock Coords
-    | Flame Coords Player
+    | Flame Coords PlayerId
     | FlamePowerup Coords
     | BombPowerup Coords
     deriving (Eq, Show)
 
 newtype Coords = Coords (Int, Int) deriving (Eq, Show)
+instance Monoid Coords where
+    mempty = Coords (0, 0)
+    mappend (Coords (x, y)) (Coords (x', y')) = Coords (x + x', y + y')
+    mconcat = foldr mappend mempty
 
 data Action
     = NoAction
@@ -330,13 +336,36 @@ queueAction playerId action (State board players stuffs bombs)
         combineActions MoveRightBomb DropBomb  = MoveRightBomb
         combineActions _ a = a
 
+
+-- tick2 :: State -> State
+-- tick2 = playerInput . explodeBombs . tickBombs . clearFlame
+--     where
+--         clearFlame (State b ps ss bs) = State b ps (clear ss) bs
+--             where
+--                 clear [] = []
+--                 clear ((Flame _ _):ss') = clear ss'
+--                 clear (s:ss') = s : clear ss'
+
+--         tickBombs (State b ps ss bs) = State b ps ss (reduce <$> bs)
+--             where
+--                 reduce (Bomb pid c (BombTicksLeft t) fc) =
+--                     Bomb pid c (BombTicksLeft $ t - 1) fc
+
+--         explodeBombs (State b ps ss bs) = State b ps (ss ++ (snd . prod <$> bs)) (fst . prod <$> bs)
+--             where
+--                 prod :: [Bomb] -> ([Bomb], [Stuff])
+--                 prod (Bomb pid c (BombTicksLeft 0) fc) = (Nothing, explode b)
+--                 prod b = (b, [])
+
+--         playerInput = id
+
 tick :: State -> State
 tick (State board players stuffs bombs) = -- TODO: maybe this should be a recursive algorithm, now it's getting more complicated
         State
             board
             (fst . processPlayer <$> players)
-            stuffs
-            (bombs ++ catMaybes (snd . processPlayer <$> players))
+            (snd tickedBombs ++ processFlames stuffs)
+            (fst tickedBombs ++ catMaybes (snd . processPlayer <$> players))
     where
         processPlayer :: Player -> (Player, Maybe Bomb)
         processPlayer dp@DisconnectedPlayer = (dp, Nothing)
@@ -394,3 +423,38 @@ tick (State board players stuffs bombs) = -- TODO: maybe this should be a recurs
             where
                 search :: Bomb -> Bool
                 search (Bomb _ coords' _ _) = coords == coords'
+
+        processFlames :: [Stuff] -> [Stuff]
+        processFlames [] = []
+        processFlames ((Flame _ _):ss) = processFlames ss
+        processFlames (s:ss) = s : processFlames ss
+
+        tickedBombs :: ([Bomb], [Stuff])
+        tickedBombs = tickBombs bombs
+            where
+                tickBombs :: [Bomb] -> ([Bomb], [Stuff])
+                tickBombs [] = ([], [])
+                tickBombs (b:bs) = case tickResult b of
+                    (Left ss)  -> (fst . tickBombs $ bs, ss ++ (snd . tickBombs $ bs))
+                    (Right tb) -> (tb : (fst . tickBombs $ bs), snd . tickBombs $ bs)
+
+                tickResult :: Bomb -> Either [Stuff] Bomb
+                tickResult b@(Bomb _ _ (BombTicksLeft 1) _) = Left (explosion b)
+                    where
+                        explosion :: Bomb -> [Stuff]
+                        explosion (Bomb pid c _ fc)
+                                =  [ Flame c pid ]
+                                ++ explode c (Coords ( 1, 0)) fc
+                                ++ explode c (Coords (-1, 0)) fc
+                                ++ explode c (Coords (0,  1)) fc
+                                ++ explode c (Coords (0, -1)) fc
+                            where
+                                -- TODO: act against anything we find on the coords
+                                explode :: Coords -> Coords -> FlameCount -> [Stuff]
+                                explode _ _ (FlameCount 0) = []
+                                explode c' δc (FlameCount fc') = (Flame newcoords pid) : (explode (c' <> δc) δc (FlameCount (fc' - 1)))
+                                    where
+                                        newcoords = c' <> δc
+
+                tickResult (Bomb pid c (BombTicksLeft t) fc) = Right (Bomb pid c (BombTicksLeft (t-1)) fc)
+

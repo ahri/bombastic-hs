@@ -1,6 +1,7 @@
 task :default => :test
 
 code = FileList.new "*/**.hs", "*/**.lhs"
+production_code = FileList.new "app/**.hs", "src/**.hs", "app/*.lhs", "src/*.lhs"
 
 desc "Build the program"
 task :build do
@@ -24,12 +25,12 @@ end
 
 desc "Lint the program"
 task :lint do
-  verbose(true) { sh "hlint #{code}" }
+  verbose(true) { sh "hlint #{production_code}" }
 end
 
 desc "Automatically apply lintings"
 task :lintapply do
-  code.each do |f|
+  production_code do |f|
     verbose(false) { sh "hlint --refactor --refactor-options=-is #{f}" }
   end
 end
