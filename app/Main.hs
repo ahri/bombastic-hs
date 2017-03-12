@@ -14,9 +14,9 @@ exampleDebugMap =
 main :: IO ()
 main = do
     let
-        getPlayers (OpaqueState _ players _ _) = players
+        getPlayers (OpaqueState _ players) = players
         oState = opaqueify <$> state
-        state = startGame [mkDebugPlayer 1 "p1", mkDebugPlayer 2 "p2"]
+        state = startGame [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
             <$> mapFromDebug exampleDebugMap
 
     putStrLn ""
