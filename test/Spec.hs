@@ -1,8 +1,12 @@
 import Test.Hspec
 import Data.List
+import qualified Data.Sequence as S
 import Bombastic
 
 data Input = Input Participant Action
+
+from2dList :: [[a]] -> (S.Seq (S.Seq a))
+from2dList = S.fromList . fmap S.fromList
 
 validMap :: [String]
 validMap =
@@ -53,7 +57,7 @@ main = hspec $ do
                     , "  "
                     ]
 
-            cells `shouldBe` Just
+            cells `shouldBe` (Just . from2dList)
                 [ [OpaqueIndestructibleBlock, OpaqueEmptyCell Nothing]
                 , [OpaqueEmptyCell Nothing  , OpaqueEmptyCell Nothing]
                 ]
@@ -94,13 +98,13 @@ main = hspec $ do
 
         context "movement" $ do
             let
-                -- initialIndestructibleBlockState = startGame players <$>
-                --     mapFromDebug indestructibleBlockMap
+                initialIndestructibleBlockState = startGame players <$>
+                    mapFromDebug indestructibleBlockMap
 
                 -- initialDestructibleBlockState = startGame players <$>
                 --     mapFromDebug destructibleBlockMap
 
-                -- players = [player]
+                players = [player]
                 player = mkDebugParticipant 1 "p1"
 
                 moveMap =
@@ -111,11 +115,11 @@ main = hspec $ do
                     , "#####"
                     ]
 
-                -- indestructibleBlockMap =
-                --     [ "###"
-                --     , "#S#"
-                --     , "###"
-                --     ]
+                indestructibleBlockMap =
+                    [ "###"
+                    , "#S#"
+                    , "###"
+                    ]
 
                 -- destructibleBlockMap =
                 --     [ "..."
@@ -123,8 +127,8 @@ main = hspec $ do
                 --     , "..."
                 --     ]
 
-                -- doesntMoveWhenTicked action state =
-                --     (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
+                doesntMoveWhenTicked action state =
+                    (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
 
             it "up" $ do
                 assertSeries
@@ -146,8 +150,8 @@ main = hspec $ do
                       )
                     ]
 
-            -- it "up against indestructible block" $ do
-            --     doesntMoveWhenTicked (Move Up) initialIndestructibleBlockState
+            it "up against indestructible block" $ do
+                doesntMoveWhenTicked (Move Up) initialIndestructibleBlockState
 
         --     it "up against destructible block" $ do
         --         doesntMoveWhenTicked (Move Up) initialDestructibleBlockState

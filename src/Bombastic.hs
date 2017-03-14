@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns, PatternSynonyms #-}
-
 module Bombastic
     ( mapFromDebug
     , DebugMap
@@ -26,14 +24,10 @@ module Bombastic
 import Data.List
 import Data.Char
 import qualified Data.Sequence as S
-import Data.Sequence (Seq, ViewL((:<)), ViewR((:>)), (<|), (|>))
+import Data.Sequence (Seq, ViewL((:<)), (<|))
 import Data.Foldable (toList)
--- import Data.Maybe
 import Data.Monoid
 
--- pattern Empty    <- (S.viewl -> S.EmptyL) where Empty = S.empty
--- pattern x  :< xs <- (S.viewl -> x  S.:< xs) where (:<)  = (<|) 
--- pattern xs :>  x <- (S.viewr -> xs S.:>  x) where (:>)  = (|>)
 
 -- Storage
 
@@ -157,13 +151,13 @@ opaqueify (State board players) = OpaqueState (opaqueifyBoard board) (opaqueifyP
 instance Show OpaqueState where
     show (OpaqueState (OpaqueBoard cells) players) = intercalate "\n" . toList $ toList <$> convertRows cells (Coords 0 0)
         where
-            convertRows S.EmptyL _ = S.empty
-            convertRows (r:<rs) coords =
-                convertRow r coords <| convertRows rs (incrementColCoords coords)
+            convertRows s coords = case S.viewl s of
+                S.EmptyL -> S.empty
+                r :< rs  -> convertRow r coords <| convertRows rs (incrementColCoords coords)
 
-            convertRow S.EmptyL _ = S.empty
-            convertRow (c:<cs) coords =
-                (addPlayer players 1 coords . convert $ c) <| convertRow cs (incrementRowCoords coords)
+            convertRow s coords = case S.viewl s of
+                S.EmptyL -> S.empty
+                c :< cs  -> (addPlayer players 1 coords . convert $ c) <| convertRow cs (incrementRowCoords coords)
 
             incrementRowCoords c = c <> (Coords 1 0)
             incrementColCoords c = c <> (Coords 0 1)
@@ -212,22 +206,22 @@ startGame participants (Map rows) = State (Board (fst convertedRows)) (snd conve
 
         convertedRows = convertRows participants rows (Coords 0 0)
 
-        convertRows :: [Participant] -> [[Tile]] -> Coords -> ([[Cell]], [Player])
-        convertRows _ [] _ = ([], [])
-        convertRows pts (ts:tss) c = (fst3 convertedRow : fst recurse, snd3 convertedRow ++ snd recurse)
+        convertRows :: [Participant] -> [[Tile]] -> Coords -> (Seq (Seq Cell), [Player])
+        convertRows _ [] _ = (S.empty, [])
+        convertRows pts (ts:tss) c = (fst3 convertedRow <| fst recurse, snd3 convertedRow ++ snd recurse)
             where
                 recurse = convertRows (thd3 convertedRow) tss (incrementColCoords c)
                 convertedRow = convertRow pts ts c
 
-        convertRow :: [Participant] -> [Tile] -> Coords -> ([Cell], [Player], [Participant])
-        convertRow pts [] _ = ([], [], pts) 
-        convertRow [] (PlayerStartPosition:ts) c = (EmptyCell Nothing : fst3 recurse, snd3 recurse, thd3 recurse)
+        convertRow :: [Participant] -> [Tile] -> Coords -> (Seq Cell, [Player], [Participant])
+        convertRow pts [] _ = (S.empty, [], pts) 
+        convertRow [] (PlayerStartPosition:ts) c = (EmptyCell Nothing <| fst3 recurse, snd3 recurse, thd3 recurse)
             where
                 recurse = convertRow [] ts (incrementRowCoords c)
-        convertRow (pt:pts) (PlayerStartPosition:ts) c = (EmptyCell Nothing : fst3 recurse, mkPlayer pt c : snd3 recurse, thd3 recurse)
+        convertRow (pt:pts) (PlayerStartPosition:ts) c = (EmptyCell Nothing <| fst3 recurse, mkPlayer pt c : snd3 recurse, thd3 recurse)
             where
                 recurse = convertRow pts ts (incrementRowCoords c)
-        convertRow pts (t:ts) c = (convert t : fst3 recurse, snd3 recurse, thd3 recurse)
+        convertRow pts (t:ts) c = (convert t <| fst3 recurse, snd3 recurse, thd3 recurse)
             where
                 recurse = convertRow pts ts (incrementRowCoords c)
 
