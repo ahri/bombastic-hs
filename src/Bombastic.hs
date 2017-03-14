@@ -81,7 +81,7 @@ instance Monoid Coords where
 data Action
     = NoAction
     | Move Direction
-    | MoveBomb Direction
+    | BombMove Direction
     | DropBomb
     | QuitGame
     deriving (Eq, Show)
@@ -208,7 +208,9 @@ startGame participants (Map rows) = State (Board (fst convertedRows)) (snd conve
 
         convertRows :: [Participant] -> [[Tile]] -> Coords -> (Seq (Seq Cell), [Player])
         convertRows _ [] _ = (S.empty, [])
-        convertRows pts (ts:tss) c = (fst3 convertedRow <| fst recurse, snd3 convertedRow ++ snd recurse)
+        convertRows pts (ts:tss) c =
+                ( fst3 convertedRow <| fst recurse
+                , snd3 convertedRow ++ snd recurse)
             where
                 recurse = convertRows (thd3 convertedRow) tss (incrementColCoords c)
                 convertedRow = convertRow pts ts c
@@ -218,10 +220,18 @@ startGame participants (Map rows) = State (Board (fst convertedRows)) (snd conve
         convertRow [] (PlayerStartPosition:ts) c = (EmptyCell Nothing <| fst3 recurse, snd3 recurse, thd3 recurse)
             where
                 recurse = convertRow [] ts (incrementRowCoords c)
-        convertRow (pt:pts) (PlayerStartPosition:ts) c = (EmptyCell Nothing <| fst3 recurse, mkPlayer pt c : snd3 recurse, thd3 recurse)
+        convertRow (pt:pts) (PlayerStartPosition:ts) c =
+                ( EmptyCell Nothing <| fst3 recurse
+                , mkPlayer pt c : snd3 recurse
+                , thd3 recurse
+                )
             where
                 recurse = convertRow pts ts (incrementRowCoords c)
-        convertRow pts (t:ts) c = (convert t <| fst3 recurse, snd3 recurse, thd3 recurse)
+        convertRow pts (t:ts) c =
+                ( convert t <| fst3 recurse
+                , snd3 recurse
+                , thd3 recurse
+                )
             where
                 recurse = convertRow pts ts (incrementRowCoords c)
 
@@ -247,8 +257,8 @@ queueAction participant action (State board players)
             | otherwise          = ConnectedPlayer ptc s bc fc c a : replacePlayerAction ps
 
         combineActions :: Action -> Action -> Action
-        combineActions (Move dir)    DropBomb   = MoveBomb dir
-        combineActions DropBomb      (Move dir) = MoveBomb dir
+        combineActions (Move dir)    DropBomb   = BombMove dir
+        combineActions DropBomb      (Move dir) = BombMove dir
         combineActions _ a = a
 
 tick :: State -> State
@@ -257,18 +267,30 @@ tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
         clearFlame = id
         tickBombs = id
         explodeBombs = id
-        processPlayerActions (State board players) = State board (act <$> players)
+        processPlayerActions (State board@(Board cells) players) = State board (act <$> players)
             where
                 act DisconnectedPlayer = DisconnectedPlayer
                 act (ConnectedPlayer ptc s bc fc coords a@(Move dir)) =
                     ConnectedPlayer ptc s bc fc (move dir coords) a
-                act (ConnectedPlayer ptc s bc fc coords (MoveBomb dir)) =
+                act (ConnectedPlayer ptc s bc fc coords (BombMove dir)) =
                     ConnectedPlayer ptc s bc fc (move dir coords) (Move dir)
                 act p@(ConnectedPlayer _ _ _ _ _ NoAction) = p
                 act p@(ConnectedPlayer _ _ _ _ _ DropBomb) = p -- TODO: implement
                 act p@(ConnectedPlayer _ _ _ _ _ QuitGame) = p -- TODO: implement
 
-                move Bombastic.Up    coords = coords <> Coords   0 (-1)
-                move Bombastic.Down  coords = coords <> Coords   0   1
-                move Bombastic.Left  coords = coords <> Coords (-1)  0
-                move Bombastic.Right coords = coords <> Coords   1   0
+                move dir currentCoords = case getCell newCoords of
+                    Nothing   -> currentCoords
+                    (Just cell) -> case cell of
+                        EmptyCell _ -> newCoords
+                        -- TODO: test for moving onto powerups
+                        _           -> currentCoords
+
+                    where
+                        getCell :: Coords -> Maybe Cell
+                        getCell (Coords x y) =  S.lookup y cells >>= S.lookup x
+                        newCoords = coordsFor dir currentCoords
+
+                coordsFor Bombastic.Up    coords = coords <> Coords   0 (-1)
+                coordsFor Bombastic.Down  coords = coords <> Coords   0   1
+                coordsFor Bombastic.Left  coords = coords <> Coords (-1)  0
+                coordsFor Bombastic.Right coords = coords <> Coords   1   0

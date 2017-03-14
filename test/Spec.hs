@@ -101,8 +101,8 @@ main = hspec $ do
                 initialIndestructibleBlockState = startGame players <$>
                     mapFromDebug indestructibleBlockMap
 
-                -- initialDestructibleBlockState = startGame players <$>
-                --     mapFromDebug destructibleBlockMap
+                initialDestructibleBlockState = startGame players <$>
+                    mapFromDebug destructibleBlockMap
 
                 players = [player]
                 player = mkDebugParticipant 1 "p1"
@@ -121,11 +121,11 @@ main = hspec $ do
                     , "###"
                     ]
 
-                -- destructibleBlockMap =
-                --     [ "..."
-                --     , ".S."
-                --     , "..."
-                --     ]
+                destructibleBlockMap =
+                    [ "..."
+                    , ".S."
+                    , "..."
+                    ]
 
                 doesntMoveWhenTicked action state =
                     (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
@@ -153,8 +153,8 @@ main = hspec $ do
             it "up against indestructible block" $ do
                 doesntMoveWhenTicked (Move Up) initialIndestructibleBlockState
 
-        --     it "up against destructible block" $ do
-        --         doesntMoveWhenTicked (Move Up) initialDestructibleBlockState
+            it "up against destructible block" $ do
+                doesntMoveWhenTicked (Move Up) initialDestructibleBlockState
 
             it "down" $ do
                 assertSeries
@@ -176,11 +176,11 @@ main = hspec $ do
                       )
                     ]
 
-        --     it "down against indestructible block" $ do
-        --         doesntMoveWhenTicked Move Down initialIndestructibleBlockState
+            it "down against indestructible block" $ do
+                doesntMoveWhenTicked (Move Down) initialIndestructibleBlockState
 
-        --     it "down against destructible block" $ do
-        --         doesntMoveWhenTicked Move Down initialDestructibleBlockState
+            it "down against destructible block" $ do
+                doesntMoveWhenTicked (Move Down) initialDestructibleBlockState
 
             it "left" $ do
                 assertSeries
@@ -202,11 +202,11 @@ main = hspec $ do
                       )
                     ]
 
-        --     it "left against indestructible block" $ do
-        --         doesntMoveWhenTicked Move Bombastic.Left initialIndestructibleBlockState
+            it "left against indestructible block" $ do
+                doesntMoveWhenTicked (Move Bombastic.Left) initialIndestructibleBlockState
 
-        --     it "left against destructible block" $ do
-        --         doesntMoveWhenTicked Move Bombastic.Left initialDestructibleBlockState
+            it "left against destructible block" $ do
+                doesntMoveWhenTicked (Move Bombastic.Left) initialDestructibleBlockState
 
             it "right" $ do
                 assertSeries
@@ -228,36 +228,36 @@ main = hspec $ do
                       )
                     ]
 
-        --     it "right against indestructible block" $ do
-        --         doesntMoveWhenTicked Move Bombastic.Right initialIndestructibleBlockState
+            it "right against indestructible block" $ do
+                doesntMoveWhenTicked (Move Bombastic.Right) initialIndestructibleBlockState
 
-        --     it "right against destructible block" $ do
-        --         doesntMoveWhenTicked Move Bombastic.Right initialDestructibleBlockState
+            it "right against destructible block" $ do
+                doesntMoveWhenTicked (Move Bombastic.Right) initialDestructibleBlockState
 
-        --     it "movement continues" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "#S  #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "#1  #"
-        --             , "#####"
-        --             ]
-        --             [ ( [Input player (Move Bombastic.Right)]
-        --               , [ "#####"
-        --                 , "# 1 #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "#  1#"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "movement continues" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#1  #"
+                    , "#####"
+                    ]
+                    [ ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#  1#"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
             it "last direction wins" $ do
                 assertSeries
@@ -280,37 +280,37 @@ main = hspec $ do
                     ]
                 
 
-        -- context "bombing" $ do
-        --     let
-        --         player = mkDebugParticipant 1 "p1"
+        context "bombing" $ do
+            let
+                player = mkDebugParticipant 1 "p1"
 
-        --         moveMap =
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# S #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
+                moveMap =
+                    [ "#####"
+                    , "#   #"
+                    , "# S #"
+                    , "#   #"
+                    , "#####"
+                    ]
 
-        --     it "a bomb is dropped" $ do
-        --         assertSeries
-        --             moveMap
-        --             [player]
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# 1 #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
-        --             [ ( [Input player DropBomb]
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q #"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "a bomb is dropped" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 1 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
         --     it "a bomb is dropped and movement occurs" $ do
         --         assertSeries
