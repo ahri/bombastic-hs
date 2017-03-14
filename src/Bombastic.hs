@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns, PatternSynonyms #-}
+
 module Bombastic
     ( mapFromDebug
     , DebugMap
@@ -23,8 +25,15 @@ module Bombastic
 
 import Data.List
 import Data.Char
+import qualified Data.Sequence as S
+import Data.Sequence (Seq, ViewL((:<)), ViewR((:>)), (<|), (|>))
+import Data.Foldable (toList)
 -- import Data.Maybe
 import Data.Monoid
+
+-- pattern Empty    <- (S.viewl -> S.EmptyL) where Empty = S.empty
+-- pattern x  :< xs <- (S.viewl -> x  S.:< xs) where (:<)  = (<|) 
+-- pattern xs :>  x <- (S.viewr -> xs S.:>  x) where (:>)  = (|>)
 
 -- Storage
 
@@ -48,7 +57,7 @@ data State = State
 
 -- TODO: switch to a 2D Seq. To ease transition see https://stackoverflow.com/questions/31106484/pattern-matching-data-sequence-like-lists
 -- TODO: Reconsider players as separate list in State
-newtype Board = Board [[Cell]] deriving (Eq, Show)
+newtype Board = Board (Seq (Seq Cell)) deriving (Eq, Show)
 
 data Player
     = DisconnectedPlayer
@@ -109,7 +118,7 @@ data OpaqueState = OpaqueState
     [OpaquePlayer]
     deriving (Eq)
 
-newtype OpaqueBoard = OpaqueBoard [[OpaqueCell]] deriving (Eq, Show)
+newtype OpaqueBoard = OpaqueBoard (Seq (Seq OpaqueCell)) deriving (Eq, Show)
 
 data OpaqueCell
     = OpaqueEmptyCell (Maybe OpaqueFlame)
@@ -145,19 +154,16 @@ opaqueify (State board players) = OpaqueState (opaqueifyBoard board) (opaqueifyP
                 convert DisconnectedPlayer = OpaqueDisconnectedPlayer
                 convert (ConnectedPlayer (Participant _ n) s _ _ c _) = OpaqueConnectedPlayer n s c
 
--- instance Show OpaqueState where
---     show (OpaqueState (OpaqueBoard cells) _) = intercalate "\n" $ ((fmap . fmap) convert $ cells)
---         where
 instance Show OpaqueState where
-    show (OpaqueState (OpaqueBoard cells) players) = intercalate "\n" $ convertRows cells (Coords 0 0)
+    show (OpaqueState (OpaqueBoard cells) players) = intercalate "\n" . toList $ toList <$> convertRows cells (Coords 0 0)
         where
-            convertRows [] _ = []
-            convertRows (r:rs) coords =
-                convertRow r coords : convertRows rs (incrementColCoords coords)
+            convertRows S.EmptyL _ = S.empty
+            convertRows (r:<rs) coords =
+                convertRow r coords <| convertRows rs (incrementColCoords coords)
 
-            convertRow [] _ = []
-            convertRow (c:cs) coords =
-                (addPlayer players 1 coords . convert $ c) : convertRow cs (incrementRowCoords coords)
+            convertRow S.EmptyL _ = S.empty
+            convertRow (c:<cs) coords =
+                (addPlayer players 1 coords . convert $ c) <| convertRow cs (incrementRowCoords coords)
 
             incrementRowCoords c = c <> (Coords 1 0)
             incrementColCoords c = c <> (Coords 0 1)
@@ -175,12 +181,12 @@ instance Show OpaqueState where
             convert OpaqueBomb = 'Q'
 
             addPlayer _ _ _ '~'  = '~'
-            addPlayer [] _ _ rep = rep
-            addPlayer (OpaqueDisconnectedPlayer:ps) n coords rep =
-                addPlayer ps (n+1) coords rep
-            addPlayer (OpaqueConnectedPlayer _ _ coords':ps) n coords rep
+            addPlayer [] _ _ repr = repr
+            addPlayer (OpaqueDisconnectedPlayer:ps) n coords repr =
+                addPlayer ps (n+1) coords repr
+            addPlayer (OpaqueConnectedPlayer _ _ coords':ps) n coords repr
                 | coords' == coords = intToDigit n
-                | otherwise = addPlayer ps (n+1) coords rep
+                | otherwise = addPlayer ps (n+1) coords repr
 
 
 -- Map loading
