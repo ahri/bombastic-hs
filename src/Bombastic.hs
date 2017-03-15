@@ -268,8 +268,9 @@ queueAction participant action (State board players bombCells)
             | otherwise          = ConnectedPlayer ptc s bc fc c a : replacePlayerAction ps
 
         combineActions :: Action -> Action -> Action
-        combineActions (Move dir)    DropBomb   = BombMove dir
-        combineActions DropBomb      (Move dir) = BombMove dir
+        combineActions (Move dir)   DropBomb   = BombMove dir
+        combineActions DropBomb     (Move dir) = BombMove dir
+        combineActions (BombMove _) (Move dir) = BombMove dir
         combineActions _ a = a
 
 tick :: State -> State
@@ -287,7 +288,7 @@ tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
                     (ConnectedPlayer ptc s bc fc coords a@(Move dir)) -> 
                         State b (ConnectedPlayer ptc s bc fc (move b dir coords) a : ps) bcs
                     (ConnectedPlayer ptc s bc fc coords (BombMove dir)) ->
-                        State b (ConnectedPlayer ptc s bc fc (move b dir coords) (Move dir) : ps) bcs
+                        State (fst . dropBomb b ptc bcs $ coords) (ConnectedPlayer ptc s bc fc (move b dir coords) (Move dir) : ps) (snd . dropBomb b ptc bcs $ coords)
                     (ConnectedPlayer ptc s bc fc coords DropBomb) ->
                         State (fst . dropBomb b ptc bcs $ coords) (ConnectedPlayer ptc s bc fc coords NoAction : ps) (snd . dropBomb b ptc bcs $ coords)
                     (ConnectedPlayer _ _ _ _ _ QuitGame) -> State b (p : ps) bcs -- TODO: add test & implement

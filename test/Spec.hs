@@ -312,98 +312,98 @@ main = hspec $ do
                       )
                     ]
 
-        --     it "a bomb is dropped and movement occurs" $ do
-        --         assertSeries
-        --             moveMap
-        --             [player]
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# 1 #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player DropBomb
-        --                 , Input player (Move Bombastic.Right)
-        --                 ]
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q1#"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "a bomb is dropped and movement occurs" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 1 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player DropBomb
+                        , Input player (Move Bombastic.Right)
+                        ]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q1#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
-        --     it "movement occurs and a bomb is dropped" $ do
-        --         assertSeries
-        --             moveMap
-        --             [player]
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# 1 #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 ]
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q1#"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "movement occurs and a bomb is dropped" $ do
+                assertSeries
+                    moveMap
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 1 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q1#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
-        --     it "movement continues without bombs dropping" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "#S  #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "#1  #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 ]
-        --               , [ "#####"
-        --                 , "#Q1 #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "#Q 1#"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "movement continues without bombs dropping" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#1  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#Q 1#"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
-        --     it "change of mind in direction still drops bomb" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "# S #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "# 1 #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 , Input player (Move Bombastic.Left)
-        --                 ]
-        --               , [ "#####"
-        --                 , "#1Q #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "change of mind in direction still drops bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "# S #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "# 1 #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        , Input player (Move Bombastic.Left)
+                        ]
+                      , [ "#####"
+                        , "#1Q #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
         --     it "repeated bomb action doesn't change anything" $ do
         --         assertSeries
