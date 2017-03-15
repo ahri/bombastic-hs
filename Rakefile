@@ -9,7 +9,7 @@ task :build do
 end
 
 desc "Interactive debug"
-task :ghci do
+task :repl do
   verbose(false) { sh "stack ghci bombastic:spec" }
 end
 

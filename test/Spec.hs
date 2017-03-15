@@ -599,6 +599,11 @@ main = hspec $ do
             --        - seems like (1) is more sensible... but also a bit risky.
             --          maybe see if modules can help us expose only certain
             --          functionality for test purposes? that'd be nice
+            --
+            --        conclusion: allow having powerups dropped already - it's
+            --        not really a problem anyway and removes all complexity. i
+            --        can then go about testing the powerup drops statistically
+            --        to ensure chance-of-drop is even across b/f/none.
 
 assertSeries :: DebugMap -> [Participant] -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names postSpawn expectations = do

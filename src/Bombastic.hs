@@ -47,11 +47,21 @@ data Tile
 data State = State
     Board
     [Player]
+    [BombCell]
     deriving (Eq, Show)
 
--- TODO: switch to a 2D Seq. To ease transition see https://stackoverflow.com/questions/31106484/pattern-matching-data-sequence-like-lists
--- TODO: Reconsider players as separate list in State
+newtype BombCell = BombCell Coords deriving (Eq, Show)
+
 newtype Board = Board (Seq (Seq Cell)) deriving (Eq, Show)
+
+getCell :: Board -> Coords -> Maybe Cell
+getCell (Board cells) (Coords x y) =  S.lookup y cells >>= S.lookup x
+
+coordsFor :: Direction -> Coords -> Coords
+coordsFor Bombastic.Up    coords = coords <> Coords   0 (-1)
+coordsFor Bombastic.Down  coords = coords <> Coords   0   1
+coordsFor Bombastic.Left  coords = coords <> Coords (-1)  0
+coordsFor Bombastic.Right coords = coords <> Coords   1   0
 
 data Player
     = DisconnectedPlayer
@@ -94,7 +104,7 @@ data Cell
     | IndestructibleBlock
     | DestructibleBlock (Maybe Flame)
     | Powerup PowerupVariety (Maybe Flame)
-    | Bomb ParticipantSecret BombTicksLeft FlameCount
+    | Bomb Participant BombTicksLeft FlameCount
     deriving (Eq, Show)
 
 newtype Flame = Flame ParticipantSecret deriving (Eq, Show)
@@ -133,7 +143,7 @@ data OpaquePlayer
     deriving (Eq, Show)
 
 opaqueify :: State -> OpaqueState
-opaqueify (State board players) = OpaqueState (opaqueifyBoard board) (opaqueifyPlayers players)
+opaqueify (State board players _) = OpaqueState (opaqueifyBoard board) (opaqueifyPlayers players)
     where
         opaqueifyBoard (Board cells) = OpaqueBoard ((fmap . fmap) convert $ cells)
             where
@@ -175,6 +185,7 @@ instance Show OpaqueState where
             convert OpaqueBomb = 'Q'
 
             addPlayer _ _ _ '~'  = '~'
+            addPlayer _ _ _ 'Q'  = 'Q'
             addPlayer [] _ _ repr = repr
             addPlayer (OpaqueDisconnectedPlayer:ps) n coords repr =
                 addPlayer ps (n+1) coords repr
@@ -198,7 +209,7 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 -- Game
 
 startGame :: [Participant] -> Map -> State
-startGame participants (Map rows) = State (Board (fst convertedRows)) (snd convertedRows)
+startGame participants (Map rows) = State (Board (fst convertedRows)) (snd convertedRows) []
     where
         fst3 (x, _, _) = x
         snd3 (_, x, _) = x
@@ -246,8 +257,8 @@ startGame participants (Map rows) = State (Board (fst convertedRows)) (snd conve
         incrementColCoords c = c <> (Coords 0 1)
 
 queueAction :: Participant -> Action -> State -> State
-queueAction participant action (State board players)
-    = State board (replacePlayerAction players)
+queueAction participant action (State board players bombCells)
+    = State board (replacePlayerAction players) bombCells
     where
         replacePlayerAction :: [Player] -> [Player]
         replacePlayerAction [] = []
@@ -267,30 +278,34 @@ tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
         clearFlame = id
         tickBombs = id
         explodeBombs = id
-        processPlayerActions (State board@(Board cells) players) = State board (act <$> players)
+        processPlayerActions (State board players bombCells) = foldr go (State board [] bombCells) players
             where
-                act DisconnectedPlayer = DisconnectedPlayer
-                act (ConnectedPlayer ptc s bc fc coords a@(Move dir)) =
-                    ConnectedPlayer ptc s bc fc (move dir coords) a
-                act (ConnectedPlayer ptc s bc fc coords (BombMove dir)) =
-                    ConnectedPlayer ptc s bc fc (move dir coords) (Move dir)
-                act p@(ConnectedPlayer _ _ _ _ _ NoAction) = p
-                act p@(ConnectedPlayer _ _ _ _ _ DropBomb) = p -- TODO: implement
-                act p@(ConnectedPlayer _ _ _ _ _ QuitGame) = p -- TODO: implement
+                go :: Player -> State -> State
+                go p (State b ps bcs) = case p of
+                    DisconnectedPlayer -> State b (p : ps) bcs
+                    (ConnectedPlayer _ _ _ _ _ NoAction) -> State b (p : ps) bcs
+                    (ConnectedPlayer ptc s bc fc coords a@(Move dir)) -> 
+                        State b (ConnectedPlayer ptc s bc fc (move b dir coords) a : ps) bcs
+                    (ConnectedPlayer ptc s bc fc coords (BombMove dir)) ->
+                        State b (ConnectedPlayer ptc s bc fc (move b dir coords) (Move dir) : ps) bcs
+                    (ConnectedPlayer ptc s bc fc coords DropBomb) ->
+                        State (fst . dropBomb b ptc bcs $ coords) (ConnectedPlayer ptc s bc fc coords NoAction : ps) (snd . dropBomb b ptc bcs $ coords)
+                    (ConnectedPlayer _ _ _ _ _ QuitGame) -> State b (p : ps) bcs -- TODO: add test & implement
 
-                move dir currentCoords = case getCell newCoords of
+                dropBomb b@(Board cells) ptc bcs c@(Coords x y) = case getCell b c of
+                    Nothing -> (b, bcs)
+                    (Just cell) -> case cell of
+                        EmptyCell _ ->
+                            ( Board . S.adjust' (S.update x (Bomb ptc (BombTicksLeft 3) (FlameCount 3))) y $ cells
+                            , BombCell c : bcs
+                            )
+                        _           -> (b, bcs)
+
+                move b d currentCoords = case getCell b newCoords of
                     Nothing   -> currentCoords
                     (Just cell) -> case cell of
                         EmptyCell _ -> newCoords
                         -- TODO: test for moving onto powerups
                         _           -> currentCoords
-
                     where
-                        getCell :: Coords -> Maybe Cell
-                        getCell (Coords x y) =  S.lookup y cells >>= S.lookup x
-                        newCoords = coordsFor dir currentCoords
-
-                coordsFor Bombastic.Up    coords = coords <> Coords   0 (-1)
-                coordsFor Bombastic.Down  coords = coords <> Coords   0   1
-                coordsFor Bombastic.Left  coords = coords <> Coords (-1)  0
-                coordsFor Bombastic.Right coords = coords <> Coords   1   0
+                        newCoords = coordsFor d currentCoords
