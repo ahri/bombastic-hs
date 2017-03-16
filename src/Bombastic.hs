@@ -294,6 +294,7 @@ tick = processPlayerActions . processBombs . clearFlame
                         _ -> State (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
                     _ -> s -- TODO: log error? could indicate a memory-leak bug
 
+                -- TODO: add test for topping-up of bomb count upon explosion
                 explode :: State -> Coords -> Participant -> FlameCount -> State
                 explode s c ptc fc =
                     explodeDir Bombastic.Right (coordsFor Bombastic.Right c) fc ptc . explodeDir Bombastic.Left (coordsFor Bombastic.Left c) fc ptc .
