@@ -271,6 +271,7 @@ queueAction participant action (State board players bombCells)
         combineActions (Move dir)   DropBomb   = BombMove dir
         combineActions DropBomb     (Move dir) = BombMove dir
         combineActions (BombMove _) (Move dir) = BombMove dir
+        combineActions a@(BombMove _) DropBomb = a
         combineActions _ a = a
 
 tick :: State -> State

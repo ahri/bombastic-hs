@@ -405,54 +405,54 @@ main = hspec $ do
                       )
                     ]
 
-        --     it "repeated bomb action doesn't change anything" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "# S #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "# 1 #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 , Input player DropBomb
-        --                 ]
-        --               , [ "#####"
-        --                 , "# Q1#"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "repeated bomb action doesn't change anything" $ do
+                assertSeries
+                    [ "#####"
+                    , "# S #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "# 1 #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "# Q1#"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
-        --     it "player cannot move onto bomb" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "#S  #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "#1  #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 ]
-        --               , [ "#####"
-        --                 , "#Q1 #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( [Input player (Move Bombastic.Left)]
-        --               , [ "#####"
-        --                 , "#Q1 #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "player cannot move onto bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#1  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Left)]
+                      , [ "#####"
+                        , "#Q1 #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
         -- context "flame" $ do
         --     let
