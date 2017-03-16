@@ -558,36 +558,36 @@ main = hspec $ do
                       )
                     ]
 
-        -- context "powerups" $ do
-        --     let
-        --         player = mkDebugParticipant 1 "p1"
+        context "powerups" $ do
+            let
+                player = mkDebugParticipant 1 "p1"
 
-        --     it "player cannot drop more than one bomb" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "#S  #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "#1  #"
-        --             , "#####"
-        --             ]
-        --             [ ( [ Input player (Move Bombastic.Right)
-        --                 , Input player DropBomb
-        --                 ]
-        --               , [ "#####"
-        --                 , "#Q1 #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( [Input player DropBomb]
-        --               , [ "#####"
-        --                 , "#Q 1#"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "player cannot drop more than one bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#1  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#Q 1#"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
             --- TODO: i want to test that extra flame and bomb powerups affect
             --        how long flame is, and how many bombs can be dropped, but

@@ -276,7 +276,7 @@ queueAction participant action (State board players bombCells)
         combineActions _ a                       = a
 
 tick :: State -> State
-tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
+tick = processPlayerActions . processBombs . clearFlame
     where
         clearFlame (State (Board cells) players bombCells) = State (Board . (fmap . fmap) clear $ cells) players bombCells
             where
@@ -284,23 +284,15 @@ tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
                 clear Flame = EmptyCell
                 clear c = c
 
-        tickBombs (State board players bombCells) = foldr go (State board players []) bombCells
-            where
-                go :: BombCell -> State -> State
-                go bc@(BombCell c) (State b ps bcs) = case getCell b c of
-                    Nothing -> State b ps bcs
-                    Just (Bomb ptc (BombTicksLeft t) fc) -> State (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
-                    _                             -> State b ps bcs -- TODO: log error?
-
-        -- TODO: integrate with tickBombs?
-        explodeBombs (State board players bombCells) = foldr go (State board players []) bombCells
+        processBombs (State board players bombCells) = foldr go (State board players []) bombCells
             where
                 go :: BombCell -> State -> State
                 go bc@(BombCell c) s@(State b ps bcs) = case getCell b c of
                     Nothing -> s
-                    Just (Bomb ptc (BombTicksLeft 0) fc) -> explode s c ptc fc
-                    Just (Bomb _ _ _) -> State b ps (bc : bcs)
-                    _                 -> s -- TODO: log error? could indicate a memory-leak bug
+                    Just (Bomb ptc (BombTicksLeft t) fc) -> case t of
+                        1 -> explode s c ptc fc
+                        _ -> State (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
+                    _ -> s -- TODO: log error? could indicate a memory-leak bug
 
                 explode :: State -> Coords -> Participant -> FlameCount -> State
                 explode s c ptc fc =
@@ -337,29 +329,65 @@ tick = processPlayerActions . explodeBombs . tickBombs . clearFlame
                 go p (State b ps bcs) = case p of
                     DisconnectedPlayer -> State b (p : ps) bcs
                     (ConnectedPlayer _ _ _ Nothing _) -> State b (p : ps) bcs
-                    (ConnectedPlayer _ _ _ _ NoAction) -> State b (p : ps) bcs
-                    (ConnectedPlayer ptc bc fc (Just coords) a@(Move dir)) -> 
-                        State b (ConnectedPlayer ptc bc fc (Just . move b dir $ coords) a : ps) bcs
-                    (ConnectedPlayer ptc bc fc (Just coords) (BombMove dir)) ->
-                        State (fst . dropBomb b ptc bcs $ coords) (ConnectedPlayer ptc bc fc (Just . move b dir $ coords) (Move dir) : ps) (snd . dropBomb b ptc bcs $ coords)
-                    (ConnectedPlayer ptc bc fc (Just coords) DropBomb) ->
-                        State (fst . dropBomb b ptc bcs $ coords) (ConnectedPlayer ptc bc fc (Just coords) NoAction : ps) (snd . dropBomb b ptc bcs $ coords)
-                    (ConnectedPlayer _ _ _ _ QuitGame) -> State b (p : ps) bcs -- TODO: add test & implement
+                    (ConnectedPlayer ptc bc fc (Just coords) a) -> case a of
+                        NoAction -> State b (p : ps) bcs
+                        Move dir -> State
+                            b
+                            ( ConnectedPlayer
+                                ptc
+                                bc
+                                fc
+                                (Just . move b dir $ coords)
+                                a
+                            : ps
+                            )
+                            bcs
+                        BombMove dir -> State
+                            (getBoard dropped)
+                            ( ConnectedPlayer
+                                ptc
+                                (getBombCount dropped)
+                                fc
+                                (Just . move b dir $ coords)
+                                (Move dir)
+                            : ps
+                            )
+                            (getBombCells dropped)
+                        DropBomb -> State
+                            (getBoard dropped)
+                            ( ConnectedPlayer
+                                ptc
+                                (getBombCount dropped)
+                                fc
+                                (Just coords)
+                                NoAction
+                            : ps
+                            )
+                            (getBombCells dropped)
+                        QuitGame -> State b (p : ps) bcs -- TODO: add test & implement
+                        where 
+                            dropped = dropBomb b ptc bcs coords bc
 
-                dropBomb b ptc bcs c = case getCell b c of
-                    Nothing -> (b, bcs)
+                getBoard     (x, _, _) = x
+                getBombCells (_, x, _) = x
+                getBombCount (_, _, x) = x
+
+                dropBomb b _ bcs _ bc@(BombCount 0) = (b, bcs, bc)
+                dropBomb b ptc bcs c bc@(BombCount bci) = case getCell b c of
+                    Nothing -> (b, bcs, bc)
                     (Just cell) -> case cell of
                         EmptyCell ->
                             ( replaceCell b c (Bomb ptc (BombTicksLeft 3) (FlameCount 3))
                             , BombCell c : bcs
+                            , BombCount (bci-1)
                             )
-                        _           -> (b, bcs)
+                        _ -> (b, bcs, bc)
 
                 move b d currentCoords = case getCell b newCoords of
                     Nothing   -> currentCoords
                     (Just cell) -> case cell of
                         EmptyCell -> newCoords
                         -- TODO: test for moving onto powerups
-                        _           -> currentCoords
+                        _         -> currentCoords
                     where
                         newCoords = coordsFor d currentCoords
