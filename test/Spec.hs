@@ -58,8 +58,8 @@ main = hspec $ do
                     ]
 
             cells `shouldBe` (Just . from2dList)
-                [ [OpaqueIndestructibleBlock, OpaqueEmptyCell Nothing]
-                , [OpaqueEmptyCell Nothing  , OpaqueEmptyCell Nothing]
+                [ [OpaqueIndestructibleBlock, OpaqueEmptyCell]
+                , [OpaqueEmptyCell,           OpaqueEmptyCell]
                 ]
 
         it "player number is correct" $ do
@@ -75,8 +75,8 @@ main = hspec $ do
                 getPlayers (OpaqueState _ ps) = ps
 
             (getPlayers <$> opaque) `shouldBe` Just
-                [ OpaqueConnectedPlayer (ParticipantName "p1") (Score 0) (Coords 0 0)
-                , OpaqueConnectedPlayer (ParticipantName "p2") (Score 0) (Coords 1 0)
+                [ OpaqueConnectedPlayer (ParticipantName "p1") (Just (Coords 0 0))
+                , OpaqueConnectedPlayer (ParticipantName "p2") (Just (Coords 1 0))
                 ]
 
 
@@ -454,109 +454,109 @@ main = hspec $ do
                       )
                     ]
 
-        -- context "flame" $ do
-        --     let
-        --         player = mkDebugParticipant 1 "p1"
+        context "flame" $ do
+            let
+                player = mkDebugParticipant 1 "p1"
 
-        --     it "basic bomb detonates after 3 ticks" $ do
-        --         assertSeries
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# S #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
-        --             [player]
-        --             [ "#####"
-        --             , "#   #"
-        --             , "# 1 #"
-        --             , "#   #"
-        --             , "#####"
-        --             ]
-        --             [ ( [Input player DropBomb]
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q #"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q #"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "# Q #"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "# ~ #"
-        --                 , "#~~~#"
-        --                 , "# ~ #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "#####"
-        --                 , "#   #"
-        --                 , "#   #"
-        --                 , "#   #"
-        --                 , "#####"
-        --                 ]
-        --               )
-        --             ]
+            it "basic bomb detonates after 3 ticks" $ do
+                assertSeries
+                    [ "#####"
+                    , "#   #"
+                    , "# S #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    [ "#####"
+                    , "#   #"
+                    , "# 1 #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "# Q #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# ~ #"
+                        , "#~~~#"
+                        , "# ~ #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "#   #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
 
-        --     it "bomb destroys destructible block but not indestructible block" $ do
-        --         assertSeries
-        --             [ "####"
-        --             , "#S.#"
-        --             , "####"
-        --             ]
-        --             [player]
-        --             [ "####"
-        --             , "#1.#"
-        --             , "####"
-        --             ]
-        --             [ ( [Input player DropBomb]
-        --               , [ "####"
-        --                 , "#Q.#"
-        --                 , "####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "####"
-        --                 , "#Q.#"
-        --                 , "####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "####"
-        --                 , "#Q.#"
-        --                 , "####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "####"
-        --                 , "#~~#"
-        --                 , "####"
-        --                 ]
-        --               )
-        --             , ( []
-        --               , [ "####"
-        --                 , "#  #"
-        --                 , "####"
-        --                 ]
-        --               )
-        --             ]
+            it "bomb destroys destructible block but not indestructible block" $ do
+                assertSeries
+                    [ "####"
+                    , "#S.#"
+                    , "####"
+                    ]
+                    [player]
+                    [ "####"
+                    , "#1.#"
+                    , "####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#~~#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#  #"
+                        , "####"
+                        ]
+                      )
+                    ]
 
         -- context "powerups" $ do
         --     let
