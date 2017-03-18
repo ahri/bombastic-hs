@@ -6,9 +6,9 @@ import Bombastic
 exampleDebugMap :: [String]
 exampleDebugMap =
     [ "######"
-    , "#S.S #"
-    , "#.S..#"
-    , "#.. S#"
+    , "#S+S #"
+    , "#+S++#"
+    , "#++ S#"
     , "######"
     ]
 

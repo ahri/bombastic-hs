@@ -191,7 +191,7 @@ instance Show OpaqueState where
             convert OpaqueEmptyCell = ' '
             convert OpaqueFlame = '~'
             convert OpaqueIndestructibleBlock = '#'
-            convert OpaqueDestructibleBlock = '.'
+            convert OpaqueDestructibleBlock = '+'
             convert (OpaquePowerup FlamePowerup) = 'f'
             convert (OpaquePowerup BombPowerup) = 'b'
             convert OpaqueBomb = 'Q'
@@ -213,7 +213,7 @@ instance Show OpaqueState where
 
 charToTile :: Char -> Maybe Tile
 charToTile '#' = Just IndestructibleTile
-charToTile '.' = Just DestructibleTile
+charToTile '+' = Just DestructibleTile
 charToTile ' ' = Just EmptyTile
 charToTile 'S' = Just PlayerStartPosition
 charToTile  _  = Nothing

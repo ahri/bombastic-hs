@@ -12,9 +12,9 @@ from2dList = S.fromList . fmap S.fromList
 validMap :: [String]
 validMap =
     [ "###################"
-    , "#S ..       .... S#"
-    , "# # # # # # #.#.# #"
-    , "#..       # ......#"
+    , "#S ++       ++++ S#"
+    , "# # # # # # #+#+# #"
+    , "#++       # ++++++#"
     , "# # # # ##### # # #"
     , "#S        #      S#"
     , "###################"
@@ -36,9 +36,9 @@ main = do
         let
             invalidMap =
                 [ "######"
-                , "#S. !#"
-                , "#.S..#"
-                , "#.. S#"
+                , "#S+ !#"
+                , "#+S++#"
+                , "#++ S#"
                 , "######"
                 ]
 
@@ -49,9 +49,9 @@ main = do
                 g
                 explosionResultNoPowerup
                 [ "###################"
-                , "#1 ..       .... 2#"
-                , "# # # # # # #.#.# #"
-                , "#..       # ......#"
+                , "#1 ++       ++++ 2#"
+                , "# # # # # # #+#+# #"
+                , "#++       # ++++++#"
                 , "# # # # ##### # # #"
                 , "#         #       #"
                 , "###################"
@@ -132,9 +132,9 @@ main = do
                     ]
 
                 destructibleBlockMap =
-                    [ "..."
-                    , ".S."
-                    , "..."
+                    [ "+++"
+                    , "+S+"
+                    , "+++"
                     ]
 
                 doesntMoveWhenTicked action state =
@@ -556,31 +556,31 @@ main = do
             it "bomb destroys destructible block but not indestructible block" $ do
                 assertSeries
                     [ "####"
-                    , "#S.#"
+                    , "#S+#"
                     , "####"
                     ]
                     [player]
                     g
                     explosionResultNoPowerup
                     [ "####"
-                    , "#1.#"
+                    , "#1+#"
                     , "####"
                     ]
                     [ ( [Input player DropBomb]
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
@@ -634,55 +634,55 @@ main = do
             it "player can drop another bomb after explosion" $ do
                 assertSeries
                     [ "######"
-                    , "#S . #"
-                    , "# .  #"
-                    , "#.   #"
+                    , "#S + #"
+                    , "# +  #"
+                    , "#+   #"
                     , "######"
                     ]
                     [player]
                     g
                     explosionResultNoPowerup
                     [ "######"
-                    , "#1 . #"
-                    , "# .  #"
-                    , "#.   #"
+                    , "#1 + #"
+                    , "# +  #"
+                    , "#+   #"
                     , "######"
                     ]
                     [ ( [Input player (Move Down)]
                       , [ "######"
-                        , "#  . #"
-                        , "#1.  #"
-                        , "#.   #"
+                        , "#  + #"
+                        , "#1+  #"
+                        , "#+   #"
                         , "######"
                         ]
                       )
                     , ( [Input player DropBomb, Input player (Move Up)]
                       , [ "######"
-                        , "#1 . #"
-                        , "#Q.  #"
-                        , "#.   #"
+                        , "#1 + #"
+                        , "#Q+  #"
+                        , "#+   #"
                         , "######"
                         ]
                       )
                     , ( [Input player (Move Bombastic.Right)]
                       , [ "######"
-                        , "# 1. #"
-                        , "#Q.  #"
-                        , "#.   #"
+                        , "# 1+ #"
+                        , "#Q+  #"
+                        , "#+   #"
                         , "######"
                         ]
                       )
                     , ( [Input player DropBomb]
                       , [ "######"
-                        , "# 1. #"
-                        , "#Q.  #"
-                        , "#.   #"
+                        , "# 1+ #"
+                        , "#Q+  #"
+                        , "#+   #"
                         , "######"
                         ]
                       )
                     , ( [Input player DropBomb]
                       , [ "######"
-                        , "#~Q. #"
+                        , "#~Q+ #"
                         , "#~~  #"
                         , "#~   #"
                         , "######"
@@ -693,31 +693,31 @@ main = do
             it "can drop flame powerup from tests" $ do
                 assertSeries
                     [ "####"
-                    , "#S.#"
+                    , "#S+#"
                     , "####"
                     ]
                     [player]
                     g
                     (\g' -> (g', Powerup FlamePowerup))
                     [ "####"
-                    , "#1.#"
+                    , "#1+#"
                     , "####"
                     ]
                     [ ( [Input player DropBomb]
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
@@ -738,31 +738,31 @@ main = do
             it "can drop bomb powerup from tests" $ do
                 assertSeries
                     [ "####"
-                    , "#S.#"
+                    , "#S+#"
                     , "####"
                     ]
                     [player]
                     g
                     (\g' -> (g', Powerup BombPowerup))
                     [ "####"
-                    , "#1.#"
+                    , "#1+#"
                     , "####"
                     ]
                     [ ( [Input player DropBomb]
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
                     , ( []
                       , [ "####"
-                        , "#Q.#"
+                        , "#Q+#"
                         , "####"
                         ]
                       )
@@ -796,7 +796,7 @@ assertSeries debugMap names g erF postSpawn expectations = do
         queueAllInputs [] s = s
         queueAllInputs (Input p a:ms) s = queueAllInputs ms (queueAction p a s)
 
-        assertOnInitial Nothing = return ()
+        assertOnInitial Nothing = error "invalid map"
         assertOnInitial (Just s) = (show . opaqueify $ s) `shouldBe` intercalate "\n" postSpawn
 
         go :: [([Input], DebugMap)] -> Maybe State -> IO ()
