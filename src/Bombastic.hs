@@ -297,9 +297,20 @@ tick = processPlayerActions . processBombs . clearFlame
                 -- TODO: add test for topping-up of bomb count upon explosion
                 explode :: State -> Coords -> Participant -> FlameCount -> State
                 explode s c ptc fc =
+                    topUpBombCount ptc .
                     explodeDir Bombastic.Right (coordsFor Bombastic.Right c) fc ptc . explodeDir Bombastic.Left (coordsFor Bombastic.Left c) fc ptc .
                     explodeDir Down (coordsFor Down c) fc ptc . explodeDir Up (coordsFor Up c) fc ptc $
                     ignite s c
+
+                topUpBombCount :: Participant -> State -> State
+                topUpBombCount ptc (State b ps bcs) = State b (topUp ps) bcs
+                    where
+                        topUp :: [Player] -> [Player]
+                        topUp [] = []
+                        topUp (DisconnectedPlayer:ps') = DisconnectedPlayer : topUp ps'
+                        topUp (p@(ConnectedPlayer ptc' (BombCount bc) fc c a):ps')
+                            | ptc' == ptc = ConnectedPlayer ptc (BombCount (bc + 1)) fc c a : topUp ps'
+                            | otherwise   = p : topUp ps'
 
                 explodeDir :: Direction -> Coords -> FlameCount -> Participant -> State -> State
                 explodeDir d c (FlameCount fc) ptc s@(State b ps bcs) = case getCell b c of

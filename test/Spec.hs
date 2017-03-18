@@ -558,6 +558,63 @@ main = hspec $ do
                       )
                     ]
 
+            it "player can drop another bomb after explosion" $ do
+                assertSeries
+                    [ "######"
+                    , "#S . #"
+                    , "# .  #"
+                    , "#.   #"
+                    , "######"
+                    ]
+                    [player]
+                    [ "######"
+                    , "#1 . #"
+                    , "# .  #"
+                    , "#.   #"
+                    , "######"
+                    ]
+                    [ ( [Input player (Move Down)]
+                      , [ "######"
+                        , "#  . #"
+                        , "#1.  #"
+                        , "#.   #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Up)]
+                      , [ "######"
+                        , "#1 . #"
+                        , "#Q.  #"
+                        , "#.   #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "######"
+                        , "# 1. #"
+                        , "#Q.  #"
+                        , "#.   #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "######"
+                        , "# 1. #"
+                        , "#Q.  #"
+                        , "#.   #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "######"
+                        , "#~Q. #"
+                        , "#~~  #"
+                        , "#~   #"
+                        , "######"
+                        ]
+                      )
+                    ]
+
         context "powerups" $ do
             let
                 player = mkDebugParticipant 1 "p1"
