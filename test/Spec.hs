@@ -23,8 +23,8 @@ validMap =
 -- cellAt :: Coords -> OpaqueState -> Cell
 -- cellAt (Coords (x, y)) (OpaqueState (Board cells2d) _ _ _) = (cells2d !! y) !! x
 
-explosionResultNoPowerup :: StdGen -> (Cell, StdGen)
-explosionResultNoPowerup g = (EmptyCell, g)
+explosionResultNoPowerup :: StdGen -> (StdGen, Cell)
+explosionResultNoPowerup g = (g, EmptyCell)
 
 main :: IO ()
 main = do
@@ -690,15 +690,106 @@ main = do
                       )
                     ]
 
-            --- TODO: i want to test that extra flame and bomb powerups affect
-            --        how long flame is, and how many bombs can be dropped, but
-            --        due to the randomness it feels like the only ways to
-            --        achieve this in a test are:
-            --          1. set a state via some hopefully-debug-only api
-            --          2. pick random seeds until one suits me, and use that to
-            --             ensure a specific powerup
+            it "can drop flame powerup from tests" $ do
+                assertSeries
+                    [ "####"
+                    , "#S.#"
+                    , "####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup FlamePowerup))
+                    [ "####"
+                    , "#1.#"
+                    , "####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#~~#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "# f#"
+                        , "####"
+                        ]
+                      )
+                    ]
 
-assertSeries :: DebugMap -> [Participant] -> StdGen -> (StdGen -> (Cell, StdGen)) -> DebugMap -> [([Input], DebugMap)] -> IO ()
+            it "can drop bomb powerup from tests" $ do
+                assertSeries
+                    [ "####"
+                    , "#S.#"
+                    , "####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup BombPowerup))
+                    [ "####"
+                    , "#1.#"
+                    , "####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q.#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#~~#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "# b#"
+                        , "####"
+                        ]
+                      )
+                    ]
+
+{-
+ - TODO:
+ -  * flame powerup works
+ -  * bomb powerup works
+ -  * quit works
+ -  * end-game works; maybe State = Ongoing ... | Finished (Maybe Participant)
+ -        strategy: rename State to Ongoing. create union. fix errors
+ -}
+
+assertSeries :: DebugMap -> [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names g erF postSpawn expectations = do
     let
         queueAllInputs :: [Input] -> State -> State

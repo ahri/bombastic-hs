@@ -50,7 +50,7 @@ data Tile
 
 data State = State
     StdGen
-    (StdGen -> (Cell, StdGen))
+    (StdGen -> (StdGen, Cell))
     Board
     [Player]
     [BombCell]
@@ -119,6 +119,7 @@ data Cell
     | Powerup PowerupVariety
     | Bomb Participant BombTicksLeft FlameCount
     | Flame
+    | FlamePendingPowerup
     deriving (Eq, Show)
 
 newtype BombCount = BombCount Integer deriving (Eq, Show)
@@ -163,6 +164,7 @@ opaqueify (State _ _ board players _) = OpaqueState (opaqueifyBoard board) (opaq
                 convert (Powerup v)         = OpaquePowerup v
                 convert (Bomb _ _ _)        = OpaqueBomb
                 convert Flame               = OpaqueFlame
+                convert FlamePendingPowerup = OpaqueFlame
 
         opaqueifyPlayers ps = convert <$> ps
             where
@@ -221,7 +223,7 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 
 -- Game
 
-startGame :: [Participant] -> StdGen -> (StdGen -> (Cell, StdGen)) -> Map -> State
+startGame :: [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> Map -> State
 startGame participants g erF (Map rows) = State g erF (Board (fst convertedRows)) (snd convertedRows) []
     where
         fst3 (x, _, _) = x
@@ -290,11 +292,15 @@ queueAction participant action (State g erF board players bombCells)
 tick :: State -> State
 tick = processPlayerActions . processBombs . clearFlame
     where
-        clearFlame (State g erF (Board cells) players bombCells) = State g erF (Board . (fmap . fmap) clear $ cells) players bombCells
+        clearFlame (State g erF (Board cells) players bombCells) = State (fst blah) erF (Board . snd $ blah) players bombCells
             where
-                clear :: Cell -> Cell
-                clear Flame = EmptyCell
-                clear c = c
+                blah :: (StdGen, Seq (Seq Cell))
+                blah = (mapAccumL . mapAccumL) process g cells
+
+                process :: StdGen -> Cell -> (StdGen, Cell)
+                process g' Flame = (g', EmptyCell)
+                process g' FlamePendingPowerup = erF g'
+                process g' c = (g', c)
 
         processBombs (State g erF board players bombCells) = foldr go (State g erF board players []) bombCells
             where
@@ -312,7 +318,7 @@ tick = processPlayerActions . processBombs . clearFlame
                     topUpBombCount ptc .
                     explodeDir Bombastic.Right (coordsFor Bombastic.Right c) fc ptc . explodeDir Bombastic.Left (coordsFor Bombastic.Left c) fc ptc .
                     explodeDir Down (coordsFor Down c) fc ptc . explodeDir Up (coordsFor Up c) fc ptc $
-                    ignite s c
+                    ignite s c Flame
 
                 topUpBombCount :: Participant -> State -> State
                 topUpBombCount ptc (State g' erF' b ps bcs) = State g' erF' b (topUp ps) bcs
@@ -329,15 +335,15 @@ tick = processPlayerActions . processBombs . clearFlame
                     Nothing -> s
                     Just cell -> case cell of
                         EmptyCell -> replacethenRecurse Flame
-                        DestructibleBlock -> ignite s c
+                        DestructibleBlock -> ignite s c FlamePendingPowerup
                         -- TODO: case where there's a powerup
                         _ -> s
                         where
                             replacethenRecurse newCell = 
                                 explodeDir d (coordsFor d c) (FlameCount (fc-1)) ptc (State g' erF' (replaceCell b c newCell) ps bcs)
 
-                ignite :: State -> Coords -> State
-                ignite (State g' erF' b ps bcs) c = State g' erF' (replaceCell b c Flame) (kill c ps) bcs
+                ignite :: State -> Coords -> Cell -> State
+                ignite (State g' erF' b ps bcs) c f = State g' erF' (replaceCell b c f) (kill c ps) bcs
 
                 kill :: Coords -> [Player] -> [Player]
                 kill _ [] = []
@@ -423,8 +429,8 @@ tick = processPlayerActions . processBombs . clearFlame
                         newCoords = coordsFor d currentCoords
 
 -- TODO: add quickcheck test for distribution
-explosionResult :: StdGen -> (Cell, StdGen)
-explosionResult = swap . fmap toCell . swap . randomR (0 :: Int, 10)
+explosionResult :: StdGen -> (StdGen, Cell)
+explosionResult = fmap toCell . swap . randomR (0 :: Int, 10)
     where
         toCell :: Int -> Cell
         toCell r
