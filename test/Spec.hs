@@ -1,5 +1,6 @@
 import Test.Hspec
 import Data.List
+import System.Random
 import qualified Data.Sequence as S
 import Bombastic
 
@@ -22,8 +23,15 @@ validMap =
 -- cellAt :: Coords -> OpaqueState -> Cell
 -- cellAt (Coords (x, y)) (OpaqueState (Board cells2d) _ _ _) = (cells2d !! y) !! x
 
+explosionResultNoPowerup :: StdGen -> (Cell, StdGen)
+explosionResultNoPowerup g = (EmptyCell, g)
+
 main :: IO ()
-main = hspec $ do
+main = do
+
+  g <- getStdGen
+  hspec $ do -- TODO: re-indent? i needed to be in the IO() monad to get g :\
+
     describe "Map load" $ do
         let
             invalidMap =
@@ -38,6 +46,8 @@ main = hspec $ do
             assertSeries
                 validMap
                 [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
+                g
+                explosionResultNoPowerup
                 [ "###################"
                 , "#1 ..       .... 2#"
                 , "# # # # # # #.#.# #"
@@ -52,7 +62,7 @@ main = hspec $ do
             let
                 cells = getCells <$> opaque
                 getCells (OpaqueState (OpaqueBoard cells2d) _) = cells2d
-                opaque = opaqueify . startGame [] <$> mapFromDebug
+                opaque = opaqueify . startGame [] g explosionResultNoPowerup <$> mapFromDebug
                     [ "# "
                     , "  "
                     ]
@@ -64,7 +74,7 @@ main = hspec $ do
 
         it "player number is correct" $ do
             let
-                opaque = opaqueify . startGame players <$> mapFromDebug
+                opaque = opaqueify . startGame players g explosionResultNoPowerup <$> mapFromDebug
                     [ "SS"
                     , "S "
                     ]
@@ -83,7 +93,7 @@ main = hspec $ do
         it "invalid map loads as Nothing" $ do
             let
                 opaque = show . opaqueify <$> state
-                state = startGame players <$> mapFromDebug invalidMap
+                state = startGame players g explosionResultNoPowerup <$> mapFromDebug invalidMap
                 players = [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
 
             opaque `shouldBe` Nothing
@@ -91,17 +101,17 @@ main = hspec $ do
     describe "Tick" $ do
         it "no-op returns same state" $ do
             let
-                state = startGame players <$> mapFromDebug validMap
+                state = startGame players g explosionResultNoPowerup <$> mapFromDebug validMap
                 players = [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
 
             tick <$> state `shouldBe` state
 
         context "movement" $ do
             let
-                initialIndestructibleBlockState = startGame players <$>
+                initialIndestructibleBlockState = startGame players g explosionResultNoPowerup <$>
                     mapFromDebug indestructibleBlockMap
 
-                initialDestructibleBlockState = startGame players <$>
+                initialDestructibleBlockState = startGame players g explosionResultNoPowerup <$>
                     mapFromDebug destructibleBlockMap
 
                 players = [player]
@@ -134,6 +144,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -160,6 +172,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -186,6 +200,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -212,6 +228,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -241,6 +259,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#1  #"
                     , "#####"
@@ -263,6 +283,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -296,6 +318,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -316,6 +340,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -338,6 +364,8 @@ main = hspec $ do
                 assertSeries
                     moveMap
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -363,6 +391,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#1  #"
                     , "#####"
@@ -390,6 +420,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "# 1 #"
                     , "#####"
@@ -412,6 +444,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "# 1 #"
                     , "#####"
@@ -434,6 +468,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#1  #"
                     , "#####"
@@ -467,6 +503,8 @@ main = hspec $ do
                     , "#####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
@@ -522,6 +560,8 @@ main = hspec $ do
                     , "####"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "####"
                     , "#1.#"
                     , "####"
@@ -558,6 +598,39 @@ main = hspec $ do
                       )
                     ]
 
+        context "powerups" $ do
+            let
+                player = mkDebugParticipant 1 "p1"
+
+            it "player cannot drop more than one bomb" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S  #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    explosionResultNoPowerup
+                    [ "#####"
+                    , "#1  #"
+                    , "#####"
+                    ]
+                    [ ( [ Input player (Move Bombastic.Right)
+                        , Input player DropBomb
+                        ]
+                      , [ "#####"
+                        , "#Q1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#Q 1#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
             it "player can drop another bomb after explosion" $ do
                 assertSeries
                     [ "######"
@@ -567,6 +640,8 @@ main = hspec $ do
                     , "######"
                     ]
                     [player]
+                    g
+                    explosionResultNoPowerup
                     [ "######"
                     , "#1 . #"
                     , "# .  #"
@@ -615,37 +690,6 @@ main = hspec $ do
                       )
                     ]
 
-        context "powerups" $ do
-            let
-                player = mkDebugParticipant 1 "p1"
-
-            it "player cannot drop more than one bomb" $ do
-                assertSeries
-                    [ "#####"
-                    , "#S  #"
-                    , "#####"
-                    ]
-                    [player]
-                    [ "#####"
-                    , "#1  #"
-                    , "#####"
-                    ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
-                        ]
-                      , [ "#####"
-                        , "#Q1 #"
-                        , "#####"
-                        ]
-                      )
-                    , ( [Input player DropBomb]
-                      , [ "#####"
-                        , "#Q 1#"
-                        , "#####"
-                        ]
-                      )
-                    ]
-
             --- TODO: i want to test that extra flame and bomb powerups affect
             --        how long flame is, and how many bombs can be dropped, but
             --        due to the randomness it feels like the only ways to
@@ -653,17 +697,9 @@ main = hspec $ do
             --          1. set a state via some hopefully-debug-only api
             --          2. pick random seeds until one suits me, and use that to
             --             ensure a specific powerup
-            --        - seems like (1) is more sensible... but also a bit risky.
-            --          maybe see if modules can help us expose only certain
-            --          functionality for test purposes? that'd be nice
-            --
-            --        conclusion: allow having powerups dropped already - it's
-            --        not really a problem anyway and removes all complexity. i
-            --        can then go about testing the powerup drops statistically
-            --        to ensure chance-of-drop is even across b/f/none.
 
-assertSeries :: DebugMap -> [Participant] -> DebugMap -> [([Input], DebugMap)] -> IO ()
-assertSeries debugMap names postSpawn expectations = do
+assertSeries :: DebugMap -> [Participant] -> StdGen -> (StdGen -> (Cell, StdGen)) -> DebugMap -> [([Input], DebugMap)] -> IO ()
+assertSeries debugMap names g erF postSpawn expectations = do
     let
         queueAllInputs :: [Input] -> State -> State
         queueAllInputs [] s = s
@@ -683,7 +719,7 @@ assertSeries debugMap names postSpawn expectations = do
             show opaqueNewState `shouldBe` intercalate "\n" e
             go xs (Just newState)
 
-        initialState = startGame names <$> mapFromDebug debugMap
+        initialState = startGame names g erF <$> mapFromDebug debugMap
 
     assertOnInitial initialState
     go expectations initialState
