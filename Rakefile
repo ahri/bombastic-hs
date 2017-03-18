@@ -10,7 +10,7 @@ end
 
 desc "Interactive debug"
 task :repl do
-  verbose(false) { sh "stack ghci bombastic:spec" }
+  verbose(false) { sh "stack ghci" }
 end
 
 desc "Run the program"
