@@ -83,7 +83,7 @@ data Player
         Participant
         BombCount
         FlameCount
-        (Maybe Coords)
+        (Maybe Coords) -- TODO: reconsider this; shall we just disconnect players that are killed? or make a NotPlaying type with reasons Disconnected and Killed if we want to store something about them
         Action
     deriving (Eq, Show)
 
@@ -332,16 +332,18 @@ tick = processPlayerActions . processBombs . clearFlame
 
                 explodeDir :: Direction -> Coords -> FlameCount -> Participant -> State -> State
                 explodeDir _ _ (FlameCount 0) _ s = s
-                explodeDir d c (FlameCount fc) ptc s@(State g' erF' b ps bcs) = case getCell b c of
+                explodeDir d c fc@(FlameCount fc') ptc s@(State g' erF' b ps bcs) = case getCell b c of
                     Nothing -> s
                     Just cell -> case cell of
-                        EmptyCell -> replacethenRecurse Flame
+                        EmptyCell -> replaceThenRecurse Flame
+                        -- TODO: case for flame should be recurse with no replace
                         DestructibleBlock -> ignite s c FlamePendingPowerup
-                        -- TODO: case where there's a powerup
+                        Powerup _ -> replaceThenRecurse Flame
+                        Bomb _ _ _ -> explode s c ptc fc
                         _ -> s
                         where
-                            replacethenRecurse newCell = 
-                                explodeDir d (coordsFor d c) (FlameCount (fc-1)) ptc (State g' erF' (replaceCell b c newCell) ps bcs)
+                            replaceThenRecurse newCell = 
+                                explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc (State g' erF' (replaceCell b c newCell) ps bcs)
 
                 ignite :: State -> Coords -> Cell -> State
                 ignite (State g' erF' b ps bcs) c f = State g' erF' (replaceCell b c f) (kill c ps) bcs
@@ -362,70 +364,73 @@ tick = processPlayerActions . processBombs . clearFlame
                     (ConnectedPlayer _ _ _ Nothing _) -> State g' erF' b (p : ps) bcs
                     (ConnectedPlayer ptc bc fc (Just coords) a) -> case a of
                         NoAction -> State g' erF' b (p : ps) bcs
-                        Move dir -> State
-                            g'
-                            erF'
-                            b
-                            ( ConnectedPlayer
-                                ptc
-                                bc
-                                fc
-                                (Just . move b dir $ coords)
-                                a
-                            : ps
-                            )
-                            bcs
-                        BombMove dir -> State
-                            g'
-                            erF'
-                            (getBoard dropped)
-                            ( ConnectedPlayer
-                                ptc
-                                (getBombCount dropped)
-                                fc
-                                (Just . move b dir $ coords)
-                                (Move dir)
-                            : ps
-                            )
-                            (getBombCells dropped)
-                        DropBomb -> State
-                            g'
-                            erF'
-                            (getBoard dropped)
-                            ( ConnectedPlayer
-                                ptc
-                                (getBombCount dropped)
-                                fc
-                                (Just coords)
-                                NoAction
-                            : ps
-                            )
-                            (getBombCells dropped)
+                        Move dir -> let
+                                (movedBoard, movedBc, movedFc, movedCoords) = move b bc fc dir coords
+                            in State
+                                g'
+                                erF'
+                                movedBoard
+                                ( ConnectedPlayer
+                                    ptc
+                                    movedBc
+                                    movedFc
+                                    (Just movedCoords)
+                                    a
+                                : ps
+                                )
+                                bcs
+                        BombMove dir -> let
+                                (droppedBoard, droppedBombCells, droppedBombCount) = dropBomb b ptc bcs coords bc fc
+                                (movedBoard, movedBc, movedFc, movedCoords) = move droppedBoard droppedBombCount fc dir coords
+                            in State
+                                g'
+                                erF'
+                                movedBoard
+                                ( ConnectedPlayer
+                                    ptc
+                                    movedBc
+                                    movedFc
+                                    (Just movedCoords)
+                                    (Move dir)
+                                : ps
+                                )
+                                droppedBombCells
+                        DropBomb -> let
+                                (droppedBoard, droppedBombCells, droppedBombCount) = dropBomb b ptc bcs coords bc fc
+                            in State
+                                g'
+                                erF'
+                                droppedBoard
+                                ( ConnectedPlayer
+                                    ptc
+                                    droppedBombCount
+                                    fc
+                                    (Just coords)
+                                    NoAction
+                                : ps
+                                )
+                                droppedBombCells
                         QuitGame -> State g' erF' b (p : ps) bcs -- TODO: add test & implement
-                        where 
-                            dropped = dropBomb b ptc bcs coords bc
 
-                getBoard     (x, _, _) = x
-                getBombCells (_, x, _) = x
-                getBombCount (_, _, x) = x
-
-                dropBomb b _ bcs _ bc@(BombCount 0) = (b, bcs, bc)
-                dropBomb b ptc bcs c bc@(BombCount bci) = case getCell b c of
+                dropBomb b _ bcs _ bc@(BombCount 0) _ = (b, bcs, bc)
+                dropBomb b ptc bcs c bc@(BombCount bci) fc = case getCell b c of
                     Nothing -> (b, bcs, bc)
                     (Just cell) -> case cell of
                         EmptyCell ->
-                            ( replaceCell b c (Bomb ptc (BombTicksLeft 3) (FlameCount 1))
+                            ( replaceCell b c (Bomb ptc (BombTicksLeft 3) fc)
                             , BombCell c : bcs
                             , BombCount (bci-1)
                             )
                         _ -> (b, bcs, bc)
 
-                move b d currentCoords = case getCell b newCoords of
-                    Nothing   -> currentCoords
+                move :: Board -> BombCount -> FlameCount -> Direction -> Coords -> (Board, BombCount, FlameCount, Coords)
+                move b bc@(BombCount bc') fc@(FlameCount fc') d currentCoords = case getCell b newCoords of
+                    Nothing   -> (b, bc, fc, currentCoords)
                     (Just cell) -> case cell of
-                        EmptyCell -> newCoords
-                        -- TODO: test for moving onto powerups
-                        _         -> currentCoords
+                        EmptyCell -> (b, bc, fc, newCoords)
+                        Powerup FlamePowerup -> (replaceCell b newCoords EmptyCell, bc, FlameCount (fc'+1), newCoords)
+                        Powerup BombPowerup  -> (replaceCell b newCoords EmptyCell, BombCount (bc'+1), fc,  newCoords)
+                        _         -> (b, bc, fc, currentCoords)
                     where
                         newCoords = coordsFor d currentCoords
 

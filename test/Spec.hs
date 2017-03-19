@@ -612,6 +612,128 @@ main = do
                       )
                     ]
 
+            it "flame is not inhibited by a powerup, but destructible blocks do inhibit it" $ do
+                assertSeries
+                    [ "######"
+                    , "#S++ #"
+                    , "#    #"
+                    , "######"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup FlamePowerup))
+                    [ "######"
+                    , "#1++ #"
+                    , "#    #"
+                    , "######"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "######"
+                        , "#Q++ #"
+                        , "#1   #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "######"
+                        , "#Q++ #"
+                        , "# 1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "######"
+                        , "#Q++ #"
+                        , "# 1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#~~+ #"
+                        , "#~1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "# f+ #"
+                        , "# 1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Up)]
+                      , [ "######"
+                        , "# 1+ #"
+                        , "#    #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "######"
+                        , "# Q+ #"
+                        , "# 1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "######"
+                        , "# Q+ #"
+                        , "#  1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "# Q+ #"
+                        , "#   1#"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Up)]
+                      , [ "######"
+                        , "#~~~1#"
+                        , "# ~  #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "######"
+                        , "#  fQ#"
+                        , "#    #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#  fQ#"
+                        , "#    #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#  fQ#"
+                        , "#    #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "# ~~~#"
+                        , "#   ~#"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#    #"
+                        , "#    #"
+                        , "######"
+                        ]
+                      )
+                    ]
+
         context "powerups" $ do
             let
                 player = mkDebugParticipant 1 "p1"
@@ -749,6 +871,288 @@ main = do
                       )
                     ]
 
+            it "flame powerup increases flame length" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup FlamePowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# f #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Up)]
+                      , [ "#####"
+                        , "# 1 #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#  1#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#  Q#"
+                        , "#  1#"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#  Q#"
+                        , "#  1#"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#  Q#"
+                        , "#  1#"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~~#"
+                        , "#  ~#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "flame powerup increases flame length, when doing a 'BombMove' onto the powerup" $ do
+                assertSeries
+                    [ "######"
+                    , "# S+ #"
+                    , "#    #"
+                    , "######"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup FlamePowerup))
+                    [ "######"
+                    , "# 1+ #"
+                    , "#    #"
+                    , "######"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "######"
+                        , "# Q+ #"
+                        , "# 1  #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "######"
+                        , "# Q+ #"
+                        , "#  1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "######"
+                        , "# Q+ #"
+                        , "#  1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#~~~ #"
+                        , "# ~1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#  f #"
+                        , "#  1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Up)]
+                      , [ "######"
+                        , "#  1 #"
+                        , "#  Q #"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "######"
+                        , "#   1#"
+                        , "#  Q #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#   1#"
+                        , "#  Q #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#  ~1#"
+                        , "# ~~~#"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "######"
+                        , "#   Q#"
+                        , "#   1#"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#   Q#"
+                        , "#   1#"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#   Q#"
+                        , "#   1#"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "# ~~~#"
+                        , "#   ~#"
+                        , "######"
+                        ]
+                      )
+                    ]
+
+            it "flame powerup is destructible" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup FlamePowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "# f #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# f #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# f #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# ~ #"
+                        , "#~~~#"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
             it "can drop bomb powerup from tests" $ do
                 assertSeries
                     [ "####"
@@ -794,12 +1198,314 @@ main = do
                       )
                     ]
 
+            it "bomb powerup increases number of bombs you can drop" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup BombPowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# b #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Up)]
+                      , [ "#####"
+                        , "# 1 #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#  1#"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#  Q#"
+                        , "#  1#"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "#  Q#"
+                        , "#  Q#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "bomb powerup increases number of bombs you can drop, when doing a 'BombMove' onto the powerup" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup BombPowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# b #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Up)]
+                      , [ "#####"
+                        , "# 1 #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "# Q #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "bomb explosions cascade" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup BombPowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# b #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb, Input player (Move Up)]
+                      , [ "#####"
+                        , "# 1 #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "# Q #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# Q #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~~#"
+                        , "#~~~#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "bomb powerup is destructible" $ do
+                assertSeries
+                    [ "#####"
+                    , "#S+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [player]
+                    g
+                    (\g' -> (g', Powerup BombPowerup))
+                    [ "#####"
+                    , "#1+ #"
+                    , "#   #"
+                    , "#####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "#1  #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Bombastic.Right)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player (Move Down)]
+                      , [ "#####"
+                        , "#Q+ #"
+                        , "# 1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#~~ #"
+                        , "#~1 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input player DropBomb]
+                      , [ "#####"
+                        , "# b #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# b #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# b #"
+                        , "# Q #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "# ~ #"
+                        , "#~~~#"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , [ "#####"
+                        , "#   #"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
 {-
  - TODO:
- -  * flame powerup works
- -  * bomb powerup works
- -  * powerups can be blown up
- -  * bombs can be triggered by flame
  -  * quit works
  -  * end-game works; maybe State = Ongoing ... | Finished (Maybe Participant)
  -        strategy: rename State to Ongoing. create union. fix errors
