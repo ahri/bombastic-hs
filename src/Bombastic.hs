@@ -331,6 +331,7 @@ tick = processPlayerActions . processBombs . clearFlame
                             | otherwise   = p : topUp ps'
 
                 explodeDir :: Direction -> Coords -> FlameCount -> Participant -> State -> State
+                explodeDir _ _ (FlameCount 0) _ s = s
                 explodeDir d c (FlameCount fc) ptc s@(State g' erF' b ps bcs) = case getCell b c of
                     Nothing -> s
                     Just cell -> case cell of
@@ -413,7 +414,7 @@ tick = processPlayerActions . processBombs . clearFlame
                     Nothing -> (b, bcs, bc)
                     (Just cell) -> case cell of
                         EmptyCell ->
-                            ( replaceCell b c (Bomb ptc (BombTicksLeft 3) (FlameCount 3))
+                            ( replaceCell b c (Bomb ptc (BombTicksLeft 3) (FlameCount 1))
                             , BombCell c : bcs
                             , BombCount (bci-1)
                             )
