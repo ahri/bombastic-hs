@@ -43,6 +43,7 @@ data Tile
     | IndestructibleTile
     | DestructibleTile
     | PlayerStartPosition
+    | PowerupTile PowerupVariety
     deriving (Eq, Show)
 
 
@@ -216,6 +217,8 @@ charToTile '#' = Just IndestructibleTile
 charToTile '+' = Just DestructibleTile
 charToTile ' ' = Just EmptyTile
 charToTile 'S' = Just PlayerStartPosition
+charToTile 'b' = Just . PowerupTile $ BombPowerup
+charToTile 'f' = Just . PowerupTile $ FlamePowerup
 charToTile  _  = Nothing
 
 mapFromDebug :: DebugMap -> Maybe Map
@@ -265,6 +268,7 @@ startGame participants g erF (Map rows) = State g erF (Board (fst convertedRows)
         convert IndestructibleTile = IndestructibleBlock
         convert DestructibleTile = DestructibleBlock
         convert PlayerStartPosition = EmptyCell
+        convert (PowerupTile v) = Powerup v
 
         mkPlayer pt c = ConnectedPlayer pt (BombCount 1) (FlameCount 1) (Just c) NoAction
 
@@ -312,7 +316,6 @@ tick = processPlayerActions . processBombs . clearFlame
                         _ -> State g' erF' (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
                     _ -> s -- TODO: log error? could indicate a memory-leak bug
 
-                -- TODO: add test for topping-up of bomb count upon explosion
                 explode :: State -> Coords -> Participant -> FlameCount -> State
                 explode s c ptc fc =
                     topUpBombCount ptc .
@@ -335,12 +338,13 @@ tick = processPlayerActions . processBombs . clearFlame
                 explodeDir d c fc@(FlameCount fc') ptc s@(State g' erF' b ps bcs) = case getCell b c of
                     Nothing -> s
                     Just cell -> case cell of
-                        EmptyCell -> replaceThenRecurse Flame
-                        -- TODO: case for flame should be recurse with no replace
-                        DestructibleBlock -> ignite s c FlamePendingPowerup
-                        Powerup _ -> replaceThenRecurse Flame
-                        Bomb _ _ _ -> explode s c ptc fc
-                        _ -> s
+                        EmptyCell           -> replaceThenRecurse Flame
+                        Flame               -> explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc s
+                        FlamePendingPowerup -> explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc s
+                        DestructibleBlock   -> ignite s c FlamePendingPowerup
+                        Powerup _           -> replaceThenRecurse Flame
+                        Bomb _ _ _          -> explode s c ptc fc
+                        _                   -> s
                         where
                             replaceThenRecurse newCell = 
                                 explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc (State g' erF' (replaceCell b c newCell) ps bcs)
