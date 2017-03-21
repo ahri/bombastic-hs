@@ -78,13 +78,14 @@ coordsFor Bombastic.Down  coords = coords <> Coords   0   1
 coordsFor Bombastic.Left  coords = coords <> Coords (-1)  0
 coordsFor Bombastic.Right coords = coords <> Coords   1   0
 
+data NoLongerPlayingReason = Quit | Killed deriving (Eq, Show)
 data Player
-    = DisconnectedPlayer
+    = NoLongerPlaying Participant NoLongerPlayingReason
     | ConnectedPlayer
         Participant
         BombCount
         FlameCount
-        (Maybe Coords) -- TODO: reconsider this; shall we just disconnect players that are killed? or make a NotPlaying type with reasons Disconnected and Killed if we want to store something about them
+        Coords
         Action
     deriving (Eq, Show)
 
@@ -148,10 +149,10 @@ data OpaqueCell
     deriving (Eq, Show)
 
 data OpaquePlayer
-    = OpaqueDisconnectedPlayer
+    = OpaqueNoLongerPlaying ParticipantName
     | OpaqueConnectedPlayer
         ParticipantName
-        (Maybe Coords)
+        Coords
     deriving (Eq, Show)
 
 opaqueify :: State -> OpaqueState
@@ -169,7 +170,7 @@ opaqueify (State _ _ board players _) = OpaqueState (opaqueifyBoard board) (opaq
 
         opaqueifyPlayers ps = convert <$> ps
             where
-                convert DisconnectedPlayer = OpaqueDisconnectedPlayer
+                convert (NoLongerPlaying (Participant _ n) _) = OpaqueNoLongerPlaying n
                 convert (ConnectedPlayer (Participant _ n) _ _ c _) = OpaqueConnectedPlayer n c
 
 instance Show OpaqueState where
@@ -201,11 +202,9 @@ instance Show OpaqueState where
             addPlayer _ _ _ '~'  = '~'
             addPlayer _ _ _ 'Q'  = 'Q'
             addPlayer [] _ _ repr = repr
-            addPlayer (OpaqueDisconnectedPlayer:ps) n coords repr =
+            addPlayer (OpaqueNoLongerPlaying _:ps) n coords repr =
                 addPlayer ps (n+1) coords repr
-            addPlayer (OpaqueConnectedPlayer _ Nothing:ps) n coords repr =
-                addPlayer ps (n+1) coords repr
-            addPlayer (OpaqueConnectedPlayer _ (Just coords'):ps) n coords repr
+            addPlayer (OpaqueConnectedPlayer _ coords':ps) n coords repr
                 | coords' == coords = intToDigit n
                 | otherwise = addPlayer ps (n+1) coords repr
 
@@ -270,7 +269,7 @@ startGame participants g erF (Map rows) = State g erF (Board (fst convertedRows)
         convert PlayerStartPosition = EmptyCell
         convert (PowerupTile v) = Powerup v
 
-        mkPlayer pt c = ConnectedPlayer pt (BombCount 1) (FlameCount 1) (Just c) NoAction
+        mkPlayer pt c = ConnectedPlayer pt (BombCount 1) (FlameCount 1) c NoAction
 
         incrementRowCoords c = c <> (Coords 1 0)
         incrementColCoords c = c <> (Coords 0 1)
@@ -281,7 +280,7 @@ queueAction participant action (State g erF board players bombCells)
     where
         replacePlayerAction :: [Player] -> [Player]
         replacePlayerAction [] = []
-        replacePlayerAction (DisconnectedPlayer : ps) = DisconnectedPlayer : replacePlayerAction ps
+        replacePlayerAction (p@(NoLongerPlaying _ _):ps) = p : replacePlayerAction ps
         replacePlayerAction (ConnectedPlayer ptc bc fc c a : ps)
             | ptc == participant = ConnectedPlayer ptc bc fc c (combineActions a action) : replacePlayerAction ps
             | otherwise          = ConnectedPlayer ptc bc fc c a : replacePlayerAction ps
@@ -328,45 +327,46 @@ tick = processPlayerActions . processBombs . clearFlame
                     where
                         topUp :: [Player] -> [Player]
                         topUp [] = []
-                        topUp (DisconnectedPlayer:ps') = DisconnectedPlayer : topUp ps'
+                        topUp (p@(NoLongerPlaying _ _):ps') = p : topUp ps'
                         topUp (p@(ConnectedPlayer ptc' (BombCount bc) fc c a):ps')
                             | ptc' == ptc = ConnectedPlayer ptc (BombCount (bc + 1)) fc c a : topUp ps'
                             | otherwise   = p : topUp ps'
 
                 explodeDir :: Direction -> Coords -> FlameCount -> Participant -> State -> State
                 explodeDir _ _ (FlameCount 0) _ s = s
-                explodeDir d c fc@(FlameCount fc') ptc s@(State g' erF' b ps bcs) = case getCell b c of
+                explodeDir d c fc@(FlameCount fc') ptc s@(State _ _ b _ _) = case getCell b c of
                     Nothing -> s
                     Just cell -> case cell of
-                        EmptyCell           -> replaceThenRecurse Flame
-                        Flame               -> explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc s
-                        FlamePendingPowerup -> explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc s
-                        DestructibleBlock   -> ignite s c FlamePendingPowerup
-                        Powerup _           -> replaceThenRecurse Flame
+                        EmptyCell           -> recurse . ign $ Flame
+                        Flame               -> recurse s
+                        FlamePendingPowerup -> recurse s
+                        DestructibleBlock   -> ign FlamePendingPowerup
+                        Powerup _           -> recurse . ign $ Flame
                         Bomb _ _ _          -> explode s c ptc fc
                         _                   -> s
                         where
-                            replaceThenRecurse newCell = 
-                                explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc (State g' erF' (replaceCell b c newCell) ps bcs)
+                            recurse :: State -> State
+                            recurse = explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc
+
+                            ign :: Cell -> State
+                            ign newCell = ignite s c newCell
 
                 ignite :: State -> Coords -> Cell -> State
                 ignite (State g' erF' b ps bcs) c f = State g' erF' (replaceCell b c f) (kill c ps) bcs
 
                 kill :: Coords -> [Player] -> [Player]
                 kill _ [] = []
-                kill c (p@(DisconnectedPlayer):ps) = p : kill c ps
-                kill c (p@(ConnectedPlayer _ _ _ Nothing _):ps) = p : kill c ps
-                kill c (p@(ConnectedPlayer ptc bc fc (Just c') _):ps)
-                    | c == c'   = ConnectedPlayer ptc bc fc Nothing NoAction : kill c ps
+                kill c (p@(NoLongerPlaying _ _):ps) = p : kill c ps
+                kill c (p@(ConnectedPlayer ptc _ _ c' _):ps)
+                    | c == c'   = NoLongerPlaying ptc Killed : kill c ps
                     | otherwise = p : kill c ps
 
         processPlayerActions (State g erF board players bombCells) = foldr go (State g erF board [] bombCells) players
             where
                 go :: Player -> State -> State
                 go p (State g' erF' b ps bcs) = case p of
-                    DisconnectedPlayer -> State g' erF' b (p : ps) bcs
-                    (ConnectedPlayer _ _ _ Nothing _) -> State g' erF' b (p : ps) bcs
-                    (ConnectedPlayer ptc bc fc (Just coords) a) -> case a of
+                    NoLongerPlaying _ _ -> State g' erF' b (p : ps) bcs
+                    (ConnectedPlayer ptc bc fc coords a) -> case a of
                         NoAction -> State g' erF' b (p : ps) bcs
                         Move dir -> let
                                 (movedBoard, movedBc, movedFc, movedCoords) = move b bc fc dir coords
@@ -378,7 +378,7 @@ tick = processPlayerActions . processBombs . clearFlame
                                     ptc
                                     movedBc
                                     movedFc
-                                    (Just movedCoords)
+                                    movedCoords
                                     a
                                 : ps
                                 )
@@ -394,7 +394,7 @@ tick = processPlayerActions . processBombs . clearFlame
                                     ptc
                                     movedBc
                                     movedFc
-                                    (Just movedCoords)
+                                    movedCoords
                                     (Move dir)
                                 : ps
                                 )
@@ -409,7 +409,7 @@ tick = processPlayerActions . processBombs . clearFlame
                                     ptc
                                     droppedBombCount
                                     fc
-                                    (Just coords)
+                                    coords
                                     NoAction
                                 : ps
                                 )

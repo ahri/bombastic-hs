@@ -85,8 +85,8 @@ main = do
                 getPlayers (OpaqueState _ ps) = ps
 
             (getPlayers <$> opaque) `shouldBe` Just
-                [ OpaqueConnectedPlayer (ParticipantName "p1") (Just (Coords 0 0))
-                , OpaqueConnectedPlayer (ParticipantName "p2") (Just (Coords 1 0))
+                [ OpaqueConnectedPlayer (ParticipantName "p1") (Coords 0 0)
+                , OpaqueConnectedPlayer (ParticipantName "p2") (Coords 1 0)
                 ]
 
 
@@ -563,6 +563,96 @@ main = do
                         , "#     #"
                         , "#     #"
                         , "#######"
+                        ]
+                      )
+                    ]
+
+            it "bomb explosion kills player" $ do
+                assertSeries
+                    [ "####"
+                    , "#S #"
+                    , "####"
+                    ]
+                    [player]
+                    g
+                    explosionResultNoPowerup
+                    [ "####"
+                    , "#1 #"
+                    , "####"
+                    ]
+                    [ ( [Input player DropBomb]
+                      , [ "####"
+                        , "#Q #"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q #"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q #"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#~~#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#  #"
+                        , "####"
+                        ]
+                      )
+                    ]
+
+            it "bomb flame kills player" $ do
+                assertSeries
+                    [ "####"
+                    , "#S #"
+                    , "####"
+                    ]
+                    [player]
+                    g
+                    explosionResultNoPowerup
+                    [ "####"
+                    , "#1 #"
+                    , "####"
+                    ]
+                    [ ( [Input player DropBomb, Input player (Move Bombastic.Right)]
+                      , [ "####"
+                        , "#Q1#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q1#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#Q1#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#~~#"
+                        , "####"
+                        ]
+                      )
+                    , ( []
+                      , [ "####"
+                        , "#  #"
+                        , "####"
                         ]
                       )
                     ]
