@@ -1,3 +1,12 @@
+{-
+ - TODO:
+ -  * flame crossover works
+ -  * quit works
+ -  * end-game works; maybe State = Ongoing ... | Finished (Maybe Participant)
+ -        strategy: rename State to Ongoing. create union. fix errors
+ -  * flame has direction (for rendering purposes)
+ -}
+
 import Test.Hspec
 import Data.List
 import System.Random
@@ -1565,15 +1574,6 @@ main = do
                         ]
                       )
                     ]
-
-{-
- - TODO:
- -  * flame crossover works
- -  * quit works
- -  * end-game works; maybe State = Ongoing ... | Finished (Maybe Participant)
- -        strategy: rename State to Ongoing. create union. fix errors
- -  * flame has direction (for rendering purposes)
- -}
 
 assertSeries :: DebugMap -> [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names g erF postSpawn expectations = do
