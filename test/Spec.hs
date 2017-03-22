@@ -1,8 +1,7 @@
 {-
  - TODO:
  -  * quit works
- -  * end-game works; maybe GameState = Ongoing ... | Finished (Maybe Participant)
- -        strategy: rename GameState to Ongoing. create union. fix errors
+ -  * games can be ended
  -  * flame has direction (for rendering purposes)
  -}
 
