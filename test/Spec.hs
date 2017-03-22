@@ -69,7 +69,8 @@ main = do
         it "asymmetrical map loads the right way up" $ do
             let
                 cells = getCells <$> opaque
-                getCells (OpaqueGameState (OpaqueBoard cells2d) _) = cells2d
+                getCells (OpaqueGameInProgress (OpaqueBoard cells2d) _) = cells2d
+                getCells s = error $ "Can't getCells on " ++ show s
                 opaque = opaqueify . startGame [] g explosionResultNoPowerup <$> mapFromDebug
                     [ "# "
                     , "  "
@@ -90,7 +91,8 @@ main = do
                     [ mkDebugParticipant 1 "p1"
                     , mkDebugParticipant 2 "p2"
                     ]
-                getPlayers (OpaqueGameState _ ps) = ps
+                getPlayers (OpaqueGameInProgress _ ps) = ps
+                getPlayers s = error $ "Can't getPlayers on " ++ show s
 
             (getPlayers <$> opaque) `shouldBe` Just
                 [ OpaqueConnectedPlayer (ParticipantName "p1") (Coords 0 0)

@@ -19,7 +19,8 @@ main = do
     let
         p1 = mkDebugParticipant 1 "p1"
         p2 = mkDebugParticipant 1 "p2"
-        getPlayers (OpaqueGameState _ players) = players
+        getPlayers (OpaqueGameInProgress _ players) = players
+        getPlayers s = error $ "Can't getPlayers on " ++ show s
         state = startGame [p1, p2] g explosionResult
             <$> mapFromDebug exampleDebugMap
 

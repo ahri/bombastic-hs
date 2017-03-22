@@ -49,18 +49,23 @@ data Tile
 
 -- State
 
-data GameState = GameState
-    StdGen
+data GameState = GameWon Participant | GameDrawn | GameInProgress
+    StdGen -- TODO: consider parameterising on RandomGen
     (StdGen -> (StdGen, Cell))
     Board
     [Player]
     [BombCell]
 
 instance Eq GameState where
-    (==) (GameState _ _ b ps _) (GameState _ _ b' ps' _) = b == b' && ps == ps'
+    (==) (GameWon ptc) (GameWon ptc') = ptc == ptc'
+    (==) GameDrawn GameDrawn = True
+    (==) (GameInProgress _ _ b ps _) (GameInProgress _ _ b' ps' _) = b == b' && ps == ps'
+    (==) _ _ = False
 
 instance Show GameState where
-    show (GameState _ _ b ps _) = show b ++ " " ++ show ps
+    show (GameWon (Participant _ (ParticipantName n))) = "Winner: " ++ n
+    show GameDrawn = "Draw"
+    show (GameInProgress _ _ b ps _) = show b ++ " " ++ show ps
 
 newtype BombCell = BombCell Coords deriving (Eq, Show)
 
@@ -132,7 +137,7 @@ data PowerupVariety = FlamePowerup | BombPowerup deriving (Eq, Show)
 
 -- Transmission
 
-data OpaqueGameState = OpaqueGameState
+data OpaqueGameState = OpaqueGameWon ParticipantName | OpaqueGameDrawn | OpaqueGameInProgress
     OpaqueBoard
     [OpaquePlayer]
     deriving (Eq)
@@ -156,7 +161,9 @@ data OpaquePlayer
     deriving (Eq, Show)
 
 opaqueify :: GameState -> OpaqueGameState
-opaqueify (GameState _ _ board players _) = OpaqueGameState (opaqueifyBoard board) (opaqueifyPlayers players)
+opaqueify (GameWon (Participant _ n)) = OpaqueGameWon n
+opaqueify GameDrawn = OpaqueGameDrawn
+opaqueify (GameInProgress _ _ board players _) = OpaqueGameInProgress (opaqueifyBoard board) (opaqueifyPlayers players)
     where
         opaqueifyBoard (Board cells) = OpaqueBoard ((fmap . fmap) convert $ cells)
             where
@@ -174,7 +181,9 @@ opaqueify (GameState _ _ board players _) = OpaqueGameState (opaqueifyBoard boar
                 convert (ConnectedPlayer (Participant _ n) _ _ c _) = OpaqueConnectedPlayer n c
 
 instance Show OpaqueGameState where
-    show (OpaqueGameState (OpaqueBoard cells) players) = intercalate "\n" . toList $ toList <$> convertRows cells (Coords 0 0)
+    show (OpaqueGameWon (ParticipantName n)) = "Winner: " ++ n
+    show OpaqueGameDrawn = "Draw"
+    show (OpaqueGameInProgress (OpaqueBoard cells) players) = intercalate "\n" . toList $ toList <$> convertRows cells (Coords 0 0)
         where
             convertRows :: Seq (Seq OpaqueCell) -> Coords -> Seq (Seq Char)
             convertRows s coords = case S.viewl s of
@@ -226,7 +235,7 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 -- Game
 
 startGame :: [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> Map -> GameState
-startGame participants g erF (Map rows) = GameState g erF (Board (fst convertedRows)) (snd convertedRows) []
+startGame participants g erF (Map rows) = GameInProgress g erF (Board (fst convertedRows)) (snd convertedRows) []
     where
         fst3 (x, _, _) = x
         snd3 (_, x, _) = x
@@ -275,8 +284,8 @@ startGame participants g erF (Map rows) = GameState g erF (Board (fst convertedR
         incrementColCoords c = c <> (Coords 0 1)
 
 queueAction :: Participant -> Action -> GameState -> GameState
-queueAction participant action (GameState g erF board players bombCells)
-    = GameState g erF board (replacePlayerAction players) bombCells
+queueAction participant action (GameInProgress g erF board players bombCells)
+    = GameInProgress g erF board (replacePlayerAction players) bombCells
     where
         replacePlayerAction :: [Player] -> [Player]
         replacePlayerAction [] = []
@@ -291,11 +300,12 @@ queueAction participant action (GameState g erF board players bombCells)
         combineActions (BombMove _)   (Move dir) = BombMove dir
         combineActions a@(BombMove _) DropBomb   = a
         combineActions _ a                       = a
+queueAction _ _ s  = s
 
 tick :: GameState -> GameState
 tick = processPlayerActions . processBombs . clearFlame
     where
-        clearFlame (GameState g erF (Board cells) players bombCells) = GameState (fst blah) erF (Board . snd $ blah) players bombCells
+        clearFlame (GameInProgress g erF (Board cells) players bombCells) = GameInProgress (fst blah) erF (Board . snd $ blah) players bombCells
             where
                 blah :: (StdGen, Seq (Seq Cell))
                 blah = (mapAccumL . mapAccumL) process g cells
@@ -304,16 +314,18 @@ tick = processPlayerActions . processBombs . clearFlame
                 process g' Flame = (g', EmptyCell)
                 process g' FlamePendingPowerup = erF g'
                 process g' c = (g', c)
+        clearFlame s = s
 
-        processBombs (GameState g erF board players bombCells) = foldr go (GameState g erF board players []) bombCells
+        processBombs (GameInProgress g erF board players bombCells) = foldr go (GameInProgress g erF board players []) bombCells
             where
                 go :: BombCell -> GameState -> GameState
-                go bc@(BombCell c) s@(GameState g' erF' b ps bcs) = case getCell b c of
+                go bc@(BombCell c) s@(GameInProgress g' erF' b ps bcs) = case getCell b c of
                     Nothing -> s
                     Just (Bomb ptc (BombTicksLeft t) fc) -> case t of
                         1 -> explode s c ptc fc
-                        _ -> GameState g' erF' (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
+                        _ -> GameInProgress g' erF' (replaceCell b c (Bomb ptc (BombTicksLeft (t - 1)) fc)) ps (bc : bcs)
                     _ -> s -- TODO: log error? could indicate a memory-leak bug
+                go _ s = s
 
                 explode :: GameState -> Coords -> Participant -> FlameCount -> GameState
                 explode s c ptc fc =
@@ -323,7 +335,7 @@ tick = processPlayerActions . processBombs . clearFlame
                     ignite s c Flame
 
                 topUpBombCount :: Participant -> GameState -> GameState
-                topUpBombCount ptc (GameState g' erF' b ps bcs) = GameState g' erF' b (topUp ps) bcs
+                topUpBombCount ptc (GameInProgress g' erF' b ps bcs) = GameInProgress g' erF' b (topUp ps) bcs
                     where
                         topUp :: [Player] -> [Player]
                         topUp [] = []
@@ -331,10 +343,11 @@ tick = processPlayerActions . processBombs . clearFlame
                         topUp (p@(ConnectedPlayer ptc' (BombCount bc) fc c a):ps')
                             | ptc' == ptc = ConnectedPlayer ptc (BombCount (bc + 1)) fc c a : topUp ps'
                             | otherwise   = p : topUp ps'
+                topUpBombCount _ s = s
 
                 explodeDir :: Direction -> Coords -> FlameCount -> Participant -> GameState -> GameState
                 explodeDir _ _ (FlameCount 0) _ s = s
-                explodeDir d c fc@(FlameCount fc') ptc s@(GameState _ _ b _ _) = case getCell b c of
+                explodeDir d c fc@(FlameCount fc') ptc s@(GameInProgress _ _ b _ _) = case getCell b c of
                     Nothing -> s
                     Just cell -> case cell of
                         EmptyCell           -> recurse . ign $ Flame
@@ -350,9 +363,11 @@ tick = processPlayerActions . processBombs . clearFlame
 
                             ign :: Cell -> GameState
                             ign newCell = ignite s c newCell
+                explodeDir _ _ _ _ s = s
 
                 ignite :: GameState -> Coords -> Cell -> GameState
-                ignite (GameState g' erF' b ps bcs) c f = GameState g' erF' (replaceCell b c f) (kill c ps) bcs
+                ignite (GameInProgress g' erF' b ps bcs) c f = GameInProgress g' erF' (replaceCell b c f) (kill c ps) bcs
+                ignite s _ _ = s
 
                 kill :: Coords -> [Player] -> [Player]
                 kill _ [] = []
@@ -360,17 +375,18 @@ tick = processPlayerActions . processBombs . clearFlame
                 kill c (p@(ConnectedPlayer ptc _ _ c' _):ps)
                     | c == c'   = NoLongerPlaying ptc Killed : kill c ps
                     | otherwise = p : kill c ps
+        processBombs s = s
 
-        processPlayerActions (GameState g erF board players bombCells) = foldr go (GameState g erF board [] bombCells) players
+        processPlayerActions (GameInProgress g erF board players bombCells) = foldr go (GameInProgress g erF board [] bombCells) players
             where
                 go :: Player -> GameState -> GameState
-                go p (GameState g' erF' b ps bcs) = case p of
-                    NoLongerPlaying _ _ -> GameState g' erF' b (p : ps) bcs
+                go p (GameInProgress g' erF' b ps bcs) = case p of
+                    NoLongerPlaying _ _ -> GameInProgress g' erF' b (p : ps) bcs
                     (ConnectedPlayer ptc bc fc coords a) -> case a of
-                        NoAction -> GameState g' erF' b (p : ps) bcs
+                        NoAction -> GameInProgress g' erF' b (p : ps) bcs
                         Move dir -> let
                                 (movedBoard, movedBc, movedFc, movedCoords) = move b bc fc dir coords
-                            in GameState
+                            in GameInProgress
                                 g'
                                 erF'
                                 movedBoard
@@ -386,7 +402,7 @@ tick = processPlayerActions . processBombs . clearFlame
                         BombMove dir -> let
                                 (droppedBoard, droppedBombCells, droppedBombCount) = dropBomb b ptc bcs coords bc fc
                                 (movedBoard, movedBc, movedFc, movedCoords) = move droppedBoard droppedBombCount fc dir coords
-                            in GameState
+                            in GameInProgress
                                 g'
                                 erF'
                                 movedBoard
@@ -401,7 +417,7 @@ tick = processPlayerActions . processBombs . clearFlame
                                 droppedBombCells
                         DropBomb -> let
                                 (droppedBoard, droppedBombCells, droppedBombCount) = dropBomb b ptc bcs coords bc fc
-                            in GameState
+                            in GameInProgress
                                 g'
                                 erF'
                                 droppedBoard
@@ -414,7 +430,8 @@ tick = processPlayerActions . processBombs . clearFlame
                                 : ps
                                 )
                                 droppedBombCells
-                        QuitGame -> GameState g' erF' b (p : ps) bcs -- TODO: add test & implement
+                        QuitGame -> GameInProgress g' erF' b (p : ps) bcs -- TODO: add test & implement
+                go _ s = s
 
                 dropBomb b _ bcs _ bc@(BombCount 0) _ = (b, bcs, bc)
                 dropBomb b ptc bcs c bc@(BombCount bci) fc = case getCell b c of
@@ -437,6 +454,7 @@ tick = processPlayerActions . processBombs . clearFlame
                         _         -> (b, bc, fc, currentCoords)
                     where
                         newCoords = coordsFor d currentCoords
+        processPlayerActions s = s
 
 -- TODO: add quickcheck test for distribution
 explosionResult :: StdGen -> (StdGen, Cell)
