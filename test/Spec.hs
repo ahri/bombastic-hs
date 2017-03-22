@@ -1,9 +1,8 @@
 {-
  - TODO:
- -  * flame crossover works
  -  * quit works
- -  * end-game works; maybe State = Ongoing ... | Finished (Maybe Participant)
- -        strategy: rename State to Ongoing. create union. fix errors
+ -  * end-game works; maybe GameState = Ongoing ... | Finished (Maybe Participant)
+ -        strategy: rename GameState to Ongoing. create union. fix errors
  -  * flame has direction (for rendering purposes)
  -}
 
@@ -29,8 +28,8 @@ validMap =
     , "###################"
     ]
 
--- cellAt :: Coords -> OpaqueState -> Cell
--- cellAt (Coords (x, y)) (OpaqueState (Board cells2d) _ _ _) = (cells2d !! y) !! x
+-- cellAt :: Coords -> OpaqueGameState -> Cell
+-- cellAt (Coords (x, y)) (OpaqueGameState (Board cells2d) _ _ _) = (cells2d !! y) !! x
 
 explosionResultNoPowerup :: StdGen -> (StdGen, Cell)
 explosionResultNoPowerup g = (g, EmptyCell)
@@ -70,7 +69,7 @@ main = do
         it "asymmetrical map loads the right way up" $ do
             let
                 cells = getCells <$> opaque
-                getCells (OpaqueState (OpaqueBoard cells2d) _) = cells2d
+                getCells (OpaqueGameState (OpaqueBoard cells2d) _) = cells2d
                 opaque = opaqueify . startGame [] g explosionResultNoPowerup <$> mapFromDebug
                     [ "# "
                     , "  "
@@ -91,7 +90,7 @@ main = do
                     [ mkDebugParticipant 1 "p1"
                     , mkDebugParticipant 2 "p2"
                     ]
-                getPlayers (OpaqueState _ ps) = ps
+                getPlayers (OpaqueGameState _ ps) = ps
 
             (getPlayers <$> opaque) `shouldBe` Just
                 [ OpaqueConnectedPlayer (ParticipantName "p1") (Coords 0 0)
@@ -117,10 +116,10 @@ main = do
 
         context "movement" $ do
             let
-                initialIndestructibleBlockState = startGame players g explosionResultNoPowerup <$>
+                initialIndestructibleBlockGameState = startGame players g explosionResultNoPowerup <$>
                     mapFromDebug indestructibleBlockMap
 
-                initialDestructibleBlockState = startGame players g explosionResultNoPowerup <$>
+                initialDestructibleBlockGameState = startGame players g explosionResultNoPowerup <$>
                     mapFromDebug destructibleBlockMap
 
                 players = [player]
@@ -172,10 +171,10 @@ main = do
                     ]
 
             it "up against indestructible block" $ do
-                doesntMoveWhenTicked (Move Up) initialIndestructibleBlockState
+                doesntMoveWhenTicked (Move Up) initialIndestructibleBlockGameState
 
             it "up against destructible block" $ do
-                doesntMoveWhenTicked (Move Up) initialDestructibleBlockState
+                doesntMoveWhenTicked (Move Up) initialDestructibleBlockGameState
 
             it "down" $ do
                 assertSeries
@@ -200,10 +199,10 @@ main = do
                     ]
 
             it "down against indestructible block" $ do
-                doesntMoveWhenTicked (Move Down) initialIndestructibleBlockState
+                doesntMoveWhenTicked (Move Down) initialIndestructibleBlockGameState
 
             it "down against destructible block" $ do
-                doesntMoveWhenTicked (Move Down) initialDestructibleBlockState
+                doesntMoveWhenTicked (Move Down) initialDestructibleBlockGameState
 
             it "left" $ do
                 assertSeries
@@ -228,10 +227,10 @@ main = do
                     ]
 
             it "left against indestructible block" $ do
-                doesntMoveWhenTicked (Move Bombastic.Left) initialIndestructibleBlockState
+                doesntMoveWhenTicked (Move Bombastic.Left) initialIndestructibleBlockGameState
 
             it "left against destructible block" $ do
-                doesntMoveWhenTicked (Move Bombastic.Left) initialDestructibleBlockState
+                doesntMoveWhenTicked (Move Bombastic.Left) initialDestructibleBlockGameState
 
             it "right" $ do
                 assertSeries
@@ -256,10 +255,10 @@ main = do
                     ]
 
             it "right against indestructible block" $ do
-                doesntMoveWhenTicked (Move Bombastic.Right) initialIndestructibleBlockState
+                doesntMoveWhenTicked (Move Bombastic.Right) initialIndestructibleBlockGameState
 
             it "right against destructible block" $ do
-                doesntMoveWhenTicked (Move Bombastic.Right) initialDestructibleBlockState
+                doesntMoveWhenTicked (Move Bombastic.Right) initialDestructibleBlockGameState
 
             it "movement continues" $ do
                 assertSeries
@@ -1578,25 +1577,25 @@ main = do
 assertSeries :: DebugMap -> [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> DebugMap -> [([Input], DebugMap)] -> IO ()
 assertSeries debugMap names g erF postSpawn expectations = do
     let
-        queueAllInputs :: [Input] -> State -> State
+        queueAllInputs :: [Input] -> GameState -> GameState
         queueAllInputs [] s = s
         queueAllInputs (Input p a:ms) s = queueAllInputs ms (queueAction p a s)
 
         assertOnInitial Nothing = error "invalid map"
         assertOnInitial (Just s) = (show . opaqueify $ s) `shouldBe` intercalate "\n" postSpawn
 
-        go :: [([Input], DebugMap)] -> Maybe State -> IO ()
+        go :: [([Input], DebugMap)] -> Maybe GameState -> IO ()
         go _ Nothing = return ()
         go [] _ = return ()
         go ((ms, e):xs) (Just s) = do
             let
-                opaqueNewState = opaqueify newState
-                newState = tick . queueAllInputs ms $ s
+                opaqueNewGameState = opaqueify newGameState
+                newGameState = tick . queueAllInputs ms $ s
 
-            show opaqueNewState `shouldBe` intercalate "\n" e
-            go xs (Just newState)
+            show opaqueNewGameState `shouldBe` intercalate "\n" e
+            go xs (Just newGameState)
 
-        initialState = startGame names g erF <$> mapFromDebug debugMap
+        initialGameState = startGame names g erF <$> mapFromDebug debugMap
 
-    assertOnInitial initialState
-    go expectations initialState
+    assertOnInitial initialGameState
+    go expectations initialGameState

@@ -19,11 +19,11 @@ main = do
     let
         p1 = mkDebugParticipant 1 "p1"
         p2 = mkDebugParticipant 1 "p2"
-        getPlayers (OpaqueState _ players) = players
+        getPlayers (OpaqueGameState _ players) = players
         state = startGame [p1, p2] g explosionResult
             <$> mapFromDebug exampleDebugMap
 
-        oState = opaqueify
+        oGameState = opaqueify
             <$> tick
             <$> tick
             <$> tick
@@ -34,8 +34,8 @@ main = do
             <$> state
 
     putStrLn ""
-    putStrLn . maybe "Invalid Map" show $ oState
+    putStrLn . maybe "Invalid Map" show $ oGameState
     putStrLn ""
-    putStrLn . maybe "Invalid Map" (show . getPlayers) $ oState
+    putStrLn . maybe "Invalid Map" (show . getPlayers) $ oGameState
     putStrLn ""
     print state
