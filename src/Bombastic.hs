@@ -165,13 +165,13 @@ opaqueify (GameWon (Participant _ n)) = OpaqueGameWon n
 opaqueify GameDrawn = OpaqueGameDrawn
 opaqueify (GameInProgress _ _ board players _) = OpaqueGameInProgress (opaqueifyBoard board) (opaqueifyPlayers players)
     where
-        opaqueifyBoard (Board cells) = OpaqueBoard ((fmap . fmap) convert $ cells)
+        opaqueifyBoard (Board cells) = OpaqueBoard ((fmap . fmap) convert cells)
             where
                 convert EmptyCell           = OpaqueEmptyCell
                 convert IndestructibleBlock = OpaqueIndestructibleBlock
                 convert DestructibleBlock   = OpaqueDestructibleBlock
                 convert (Powerup v)         = OpaquePowerup v
-                convert (Bomb _ _ _)        = OpaqueBomb
+                convert Bomb{}              = OpaqueBomb
                 convert Flame               = OpaqueFlame
                 convert FlamePendingPowerup = OpaqueFlame
 
@@ -195,8 +195,8 @@ instance Show OpaqueGameState where
                 S.EmptyL -> S.empty
                 c :< cs  -> (addPlayer players 1 coords . convert $ c) <| convertRow cs (incrementRowCoords coords)
 
-            incrementRowCoords c = c <> (Coords 1 0)
-            incrementColCoords c = c <> (Coords 0 1)
+            incrementRowCoords c = c <> Coords 1 0
+            incrementColCoords c = c <> Coords 0 1
 
             convert :: OpaqueCell -> Char
             convert OpaqueEmptyCell = ' '
@@ -235,42 +235,38 @@ mapFromDebug = fmap Map . sequence . fmap (sequence . fmap charToTile)
 -- Game
 
 startGame :: [Participant] -> StdGen -> (StdGen -> (StdGen, Cell)) -> Map -> GameState
-startGame participants g erF (Map rows) = GameInProgress g erF (Board (fst convertedRows)) (snd convertedRows) []
+startGame participants g erF (Map rows) = GameInProgress g erF (Board cells) players []
     where
-        fst3 (x, _, _) = x
-        snd3 (_, x, _) = x
-        thd3 (_, _, x) = x
-
-        convertedRows = convertRows participants rows (Coords 0 0)
+        (cells, players) = convertRows participants rows (Coords 0 0)
 
         convertRows :: [Participant] -> [[Tile]] -> Coords -> (Seq (Seq Cell), [Player])
         convertRows _ [] _ = (S.empty, [])
-        convertRows pts (ts:tss) c =
-                ( fst3 convertedRow <| fst recurse
-                , snd3 convertedRow ++ snd recurse)
+        convertRows ptcs (ts:tss) c =
+                ( cs <| css
+                , r_plys ++ plys)
             where
-                recurse = convertRows (thd3 convertedRow) tss (incrementColCoords c)
-                convertedRow = convertRow pts ts c
+                (css, plys) = convertRows ptcs' tss (incrementColCoords c)
+                (cs, r_plys, ptcs') = convertRow ptcs ts c
 
         convertRow :: [Participant] -> [Tile] -> Coords -> (Seq Cell, [Player], [Participant])
         convertRow pts [] _ = (S.empty, [], pts) 
-        convertRow [] (PlayerStartPosition:ts) c = (EmptyCell <| fst3 recurse, snd3 recurse, thd3 recurse)
+        convertRow [] (PlayerStartPosition:ts) c = (EmptyCell <| cs, plys, ptcs)
             where
-                recurse = convertRow [] ts (incrementRowCoords c)
-        convertRow (pt:pts) (PlayerStartPosition:ts) c =
-                ( convert PlayerStartPosition <| fst3 recurse
-                , mkPlayer pt c : snd3 recurse
-                , thd3 recurse
+                (cs, plys, ptcs) = convertRow [] ts (incrementRowCoords c)
+        convertRow (ptc:ptcs) (PlayerStartPosition:ts) c =
+                ( convert PlayerStartPosition <| cs
+                , mkPlayer ptc c : plys
+                , ptcs'
                 )
             where
-                recurse = convertRow pts ts (incrementRowCoords c)
-        convertRow pts (t:ts) c =
-                ( convert t <| fst3 recurse
-                , snd3 recurse
-                , thd3 recurse
+                (cs, plys, ptcs') = convertRow ptcs ts (incrementRowCoords c)
+        convertRow ptcs (t:ts) c =
+                ( convert t <| cs
+                , plys
+                , ptcs'
                 )
             where
-                recurse = convertRow pts ts (incrementRowCoords c)
+                (cs, plys, ptcs') = convertRow ptcs ts (incrementRowCoords c)
 
         convert EmptyTile = EmptyCell
         convert IndestructibleTile = IndestructibleBlock
@@ -280,8 +276,8 @@ startGame participants g erF (Map rows) = GameInProgress g erF (Board (fst conve
 
         mkPlayer pt c = ConnectedPlayer pt (BombCount 1) (FlameCount 1) c NoAction
 
-        incrementRowCoords c = c <> (Coords 1 0)
-        incrementColCoords c = c <> (Coords 0 1)
+        incrementRowCoords c = c <> Coords 1 0
+        incrementColCoords c = c <> Coords 0 1
 
 queueAction :: Participant -> Action -> GameState -> GameState
 queueAction participant action (GameInProgress g erF board players bombCells)
@@ -305,10 +301,9 @@ queueAction _ _ s  = s
 tick :: GameState -> GameState
 tick = processPlayerActions . processBombs . endGame . clearFlame
     where
-        clearFlame (GameInProgress g erF (Board cells) players bombCells) = GameInProgress (fst blah) erF (Board . snd $ blah) players bombCells
+        clearFlame (GameInProgress g erF (Board cells) players bombCells) = GameInProgress g'' erF (Board css) players bombCells
             where
-                blah :: (StdGen, Seq (Seq Cell))
-                blah = (mapAccumL . mapAccumL) process g cells
+                (g'', css) = (mapAccumL . mapAccumL) process g cells
 
                 process :: StdGen -> Cell -> (StdGen, Cell)
                 process g' Flame = (g', EmptyCell)
@@ -355,14 +350,14 @@ tick = processPlayerActions . processBombs . endGame . clearFlame
                         FlamePendingPowerup -> recurse s
                         DestructibleBlock   -> ign FlamePendingPowerup
                         Powerup _           -> recurse . ign $ Flame
-                        Bomb _ _ _          -> explode s c ptc fc
+                        Bomb{}              -> explode s c ptc fc
                         _                   -> s
                         where
                             recurse :: GameState -> GameState
                             recurse = explodeDir d (coordsFor d c) (FlameCount (fc'-1)) ptc
 
                             ign :: Cell -> GameState
-                            ign newCell = ignite s c newCell
+                            ign = ignite s c
                 explodeDir _ _ _ _ s = s
 
                 ignite :: GameState -> Coords -> Cell -> GameState
@@ -377,16 +372,13 @@ tick = processPlayerActions . processBombs . endGame . clearFlame
                     | otherwise = p : kill c ps
         processBombs s = s
 
-        endGame s@(GameInProgress _ _ _ players _) = case length activePlayers of
-            0 -> GameDrawn
-            1 -> GameWon (getPtc . head $ activePlayers)
+        endGame s@(GameInProgress _ _ _ players _) = case filter activePlayer players of
+            [] -> GameDrawn
+            [ConnectedPlayer ptc _ _ _ _] -> GameWon ptc
             _ -> s
             where
-                activePlayers = filter activePlayer $ players
-                activePlayer (ConnectedPlayer _ _ _ _ _) = True
+                activePlayer ConnectedPlayer{} = True
                 activePlayer _ = False
-                getPtc (ConnectedPlayer ptc _ _ _ _) = ptc
-                getPtc _ = error "wtf"
         endGame s = s
 
         processPlayerActions (GameInProgress g erF board players bombCells) = foldr go (GameInProgress g erF board [] bombCells) players
