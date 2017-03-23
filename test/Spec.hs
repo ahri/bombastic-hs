@@ -38,6 +38,11 @@ main = do
 
   g <- getStdGen
   hspec $ do -- TODO: re-indent? i needed to be in the IO() monad to get g :\
+    let
+        players = [p1, p2, p3]
+        p1 = mkDebugParticipant 1 "p1"
+        p2 = mkDebugParticipant 2 "p2"
+        p3 = mkDebugParticipant 3 "p3"
 
     describe "Map load" $ do
         let
@@ -82,13 +87,9 @@ main = do
 
         it "player number is correct" $ do
             let
-                opaque = opaqueify . startGame players g explosionResultNoPowerup <$> mapFromDebug
+                opaque = opaqueify . startGame [p1, p2] g explosionResultNoPowerup <$> mapFromDebug
                     [ "SS"
                     , "S "
-                    ]
-                players =
-                    [ mkDebugParticipant 1 "p1"
-                    , mkDebugParticipant 2 "p2"
                     ]
                 getPlayers (OpaqueGameInProgress _ ps) = ps
                 getPlayers s = error $ "Can't getPlayers on " ++ show s
@@ -103,7 +104,6 @@ main = do
             let
                 opaque = show . opaqueify <$> state
                 state = startGame players g explosionResultNoPowerup <$> mapFromDebug invalidMap
-                players = [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
 
             opaque `shouldBe` Nothing
 
@@ -111,9 +111,76 @@ main = do
         it "no-op returns same state" $ do
             let
                 state = startGame players g explosionResultNoPowerup <$> mapFromDebug validMap
-                players = [mkDebugParticipant 1 "p1", mkDebugParticipant 2 "p2"]
 
             tick <$> state `shouldBe` state
+
+        context "game ending" $ do
+            let
+                moveMap =
+                    [ "#####"
+                    , "#SSS#"
+                    , "#####"
+                    ]
+
+            it "a player quits" $ do
+                assertSeries
+                    moveMap
+                    players
+                    g
+                    explosionResultNoPowerup
+                    [ "#####"
+                    , "#123#"
+                    , "#####"
+                    ]
+                    [ ( [Input p1 QuitGame]
+                      , [ "#####"
+                        , "# 23#"
+                        , "#####"
+                        ]
+                      )
+                    ]
+
+            it "all players quit" $ do
+                assertSeries
+                    moveMap
+                    [p1, p2, p3]
+                    g
+                    explosionResultNoPowerup
+                    [ "#####"
+                    , "#123#"
+                    , "#####"
+                    ]
+                    [ ( [Input p1 QuitGame, Input p2 QuitGame, Input p3 QuitGame]
+                      , [ "#####"
+                        , "#   #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , ["Draw"]
+                      )
+                    ]
+
+            it "one player remains" $ do
+                assertSeries
+                    moveMap
+                    [p1, p2, p3]
+                    g
+                    explosionResultNoPowerup
+                    [ "#####"
+                    , "#123#"
+                    , "#####"
+                    ]
+                    [ ( [Input p1 QuitGame, Input p3 QuitGame]
+                      , [ "#####"
+                        , "# 2 #"
+                        , "#####"
+                        ]
+                      )
+                    , ( []
+                      , ["Winner: p2"]
+                      )
+                    ]
 
         context "movement" $ do
             let
@@ -123,49 +190,46 @@ main = do
                 initialDestructibleBlockGameState = startGame players g explosionResultNoPowerup <$>
                     mapFromDebug destructibleBlockMap
 
-                players = [player]
-                player = mkDebugParticipant 1 "p1"
-
                 moveMap =
                     [ "#####"
                     , "#   #"
                     , "# S #"
-                    , "#   #"
+                    , "# S #"
                     , "#####"
                     ]
 
                 indestructibleBlockMap =
-                    [ "###"
-                    , "#S#"
-                    , "###"
+                    [ "#####"
+                    , "#S#S#"
+                    , "#####"
                     ]
 
                 destructibleBlockMap =
-                    [ "+++"
-                    , "+S+"
-                    , "+++"
+                    [ "+++++"
+                    , "+S+S+"
+                    , "+++++"
                     ]
 
                 doesntMoveWhenTicked action state =
-                    (opaqueify . tick . queueAction player action <$> state) `shouldBe` (opaqueify <$> state)
+                    (opaqueify . tick . queueAction p1 action <$> state) `shouldBe` (opaqueify <$> state)
 
             it "up" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Up)]
+                    [ ( [Input p1 (Move Up)]
                       , [ "#####"
                         , "# 1 #"
                         , "#   #"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -180,16 +244,16 @@ main = do
             it "down" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Down)]
+                    [ ( [Input p1 (Move Down)]
                       , [ "#####"
                         , "#   #"
                         , "#   #"
@@ -208,20 +272,20 @@ main = do
             it "left" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Bombastic.Left)]
+                    [ ( [Input p1 (Move Bombastic.Left)]
                       , [ "#####"
                         , "#   #"
                         , "#1  #"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -236,20 +300,20 @@ main = do
             it "right" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Bombastic.Right)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "#   #"
                         , "#  1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -264,17 +328,17 @@ main = do
             it "movement continues" $ do
                 assertSeries
                     [ "#####"
-                    , "#S  #"
+                    , "#SS #"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "#1  #"
+                    , "#12 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Bombastic.Right)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "# 1 #"
                         , "#####"
@@ -282,7 +346,7 @@ main = do
                       )
                     , ( []
                       , [ "#####"
-                        , "#  1#"
+                        , "# 21#"
                         , "#####"
                         ]
                       )
@@ -291,20 +355,20 @@ main = do
             it "last direction wins" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Bombastic.Left), Input player (Move Bombastic.Right)]
+                    [ ( [Input p1 (Move Bombastic.Left), Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "#   #"
                         , "#  1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -313,33 +377,31 @@ main = do
 
         context "bombing" $ do
             let
-                player = mkDebugParticipant 1 "p1"
-
                 moveMap =
                     [ "#####"
                     , "#   #"
                     , "# S #"
-                    , "#   #"
+                    , "# S #"
                     , "#####"
                     ]
 
             it "a bomb is dropped" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player DropBomb]
+                    [ ( [Input p1 DropBomb]
                       , [ "#####"
                         , "#   #"
                         , "# Q #"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -348,22 +410,22 @@ main = do
             it "a bomb is dropped and movement occurs" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [ Input player DropBomb
-                        , Input player (Move Bombastic.Right)
+                    [ ( [ Input p1 DropBomb
+                        , Input p1 (Move Bombastic.Right)
                         ]
                       , [ "#####"
                         , "#   #"
                         , "# Q1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -372,22 +434,22 @@ main = do
             it "movement occurs and a bomb is dropped" $ do
                 assertSeries
                     moveMap
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "#   #"
                     , "# 1 #"
-                    , "#   #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
                         ]
                       , [ "#####"
                         , "#   #"
                         , "# Q1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
@@ -396,18 +458,18 @@ main = do
             it "movement continues without bombs dropping" $ do
                 assertSeries
                     [ "#####"
-                    , "#S  #"
+                    , "#SS #"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "#1  #"
+                    , "#12 #"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
                         ]
                       , [ "#####"
                         , "#Q1 #"
@@ -416,7 +478,7 @@ main = do
                       )
                     , ( []
                       , [ "#####"
-                        , "#Q 1#"
+                        , "#Q21#"
                         , "#####"
                         ]
                       )
@@ -425,22 +487,22 @@ main = do
             it "change of mind in direction still drops bomb" $ do
                 assertSeries
                     [ "#####"
-                    , "# S #"
+                    , "# SS#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "# 1 #"
+                    , "# 12#"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
-                        , Input player (Move Bombastic.Left)
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
+                        , Input p1 (Move Bombastic.Left)
                         ]
                       , [ "#####"
-                        , "#1Q #"
+                        , "#1Q2#"
                         , "#####"
                         ]
                       )
@@ -449,19 +511,19 @@ main = do
             it "repeated bomb action doesn't change anything" $ do
                 assertSeries
                     [ "#####"
-                    , "# S #"
+                    , "# SS#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "# 1 #"
+                    , "# 12#"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
-                        , Input player DropBomb
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
+                        , Input p1 DropBomb
                         ]
                       , [ "#####"
                         , "# Q1#"
@@ -473,36 +535,33 @@ main = do
             it "player cannot move onto bomb" $ do
                 assertSeries
                     [ "#####"
-                    , "#S  #"
+                    , "#S S#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "#1  #"
+                    , "#1 2#"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
                         ]
                       , [ "#####"
-                        , "#Q1 #"
+                        , "#Q12#"
                         , "#####"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Left)]
+                    , ( [Input p1 (Move Bombastic.Left)]
                       , [ "#####"
-                        , "#Q1 #"
+                        , "#Q12#"
                         , "#####"
                         ]
                       )
                     ]
 
         context "flame" $ do
-            let
-                player = mkDebugParticipant 1 "p1"
-
             it "basic bomb detonates after 3 ticks" $ do
                 assertSeries
                     [ "#######"
@@ -510,10 +569,10 @@ main = do
                     , "#     #"
                     , "#  S  #"
                     , "#     #"
-                    , "#     #"
+                    , "#    S#"
                     , "#######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#######"
@@ -521,56 +580,56 @@ main = do
                     , "#     #"
                     , "#  1  #"
                     , "#     #"
-                    , "#     #"
+                    , "#    2#"
                     , "#######"
                     ]
-                    [ ( [Input player DropBomb]
+                    [ ( [Input p1 DropBomb, Input p1 (Move Up)]
                       , [ "#######"
                         , "#     #"
-                        , "#     #"
+                        , "#  1  #"
                         , "#  Q  #"
                         , "#     #"
-                        , "#     #"
+                        , "#    2#"
                         , "#######"
                         ]
                       )
                     , ( []
                       , [ "#######"
-                        , "#     #"
+                        , "#  1  #"
                         , "#     #"
                         , "#  Q  #"
                         , "#     #"
-                        , "#     #"
+                        , "#    2#"
                         , "#######"
                         ]
                       )
                     , ( []
                       , [ "#######"
-                        , "#     #"
+                        , "#  1  #"
                         , "#     #"
                         , "#  Q  #"
                         , "#     #"
-                        , "#     #"
+                        , "#    2#"
                         , "#######"
                         ]
                       )
                     , ( []
                       , [ "#######"
-                        , "#     #"
+                        , "#  1  #"
                         , "#  ~  #"
                         , "# ~~~ #"
                         , "#  ~  #"
-                        , "#     #"
+                        , "#    2#"
                         , "#######"
                         ]
                       )
                     , ( []
                       , [ "#######"
+                        , "#  1  #"
                         , "#     #"
                         , "#     #"
                         , "#     #"
-                        , "#     #"
-                        , "#     #"
+                        , "#    2#"
                         , "#######"
                         ]
                       )
@@ -578,258 +637,245 @@ main = do
 
             it "bomb explosion kills player" $ do
                 assertSeries
-                    [ "####"
-                    , "#S #"
-                    , "####"
+                    [ "######"
+                    , "#S #S#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
-                    [ "####"
-                    , "#1 #"
-                    , "####"
+                    [ "######"
+                    , "#1 #2#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q #"
-                        , "####"
+                    [ ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q #2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q #"
-                        , "####"
+                      , [ "######"
+                        , "#Q #2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q #"
-                        , "####"
+                      , [ "######"
+                        , "#Q #2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                      , [ "######"
+                        , "#~~#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#  #"
-                        , "####"
-                        ]
+                      , ["Winner: p2"]
                       )
                     ]
 
             it "bomb flame kills player" $ do
                 assertSeries
-                    [ "####"
-                    , "#S #"
-                    , "####"
+                    [ "######"
+                    , "#S #S#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
-                    [ "####"
-                    , "#1 #"
-                    , "####"
+                    [ "######"
+                    , "#1 #2#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Bombastic.Right)]
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                    [ ( [Input p1 DropBomb, Input p1 (Move Bombastic.Right)]
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                      , [ "######"
+                        , "#~~#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#  #"
-                        , "####"
-                        ]
+                      , ["Winner: p2"]
                       )
                     ]
 
             it "bomb destroys destructible block but not indestructible block" $ do
                 assertSeries
-                    [ "####"
-                    , "#S+#"
-                    , "####"
+                    [ "######"
+                    , "#S+#S#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
-                    [ "####"
-                    , "#1+#"
-                    , "####"
+                    [ "######"
+                    , "#1+#2#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                    [ ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q+#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                      , [ "######"
+                        , "#~~#2#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#  #"
-                        , "####"
-                        ]
+                      , ["Winner: p2"]
                       )
                     ]
 
             it "flame is not inhibited by a powerup, but destructible blocks do inhibit it" $ do
                 assertSeries
-                    [ "######"
-                    , "#S++ #"
-                    , "#    #"
+                    [ "########"
+                    , "#S++ #S#"
+                    , "#    ###"
                     , "######"
                     ]
-                    [player]
+                    players
                     g
                     (\g' -> (g', Powerup FlamePowerup))
-                    [ "######"
-                    , "#1++ #"
-                    , "#    #"
+                    [ "########"
+                    , "#1++ #2#"
+                    , "#    ###"
                     , "######"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Down)]
-                      , [ "######"
-                        , "#Q++ #"
-                        , "#1   #"
+                    [ ( [Input p1 DropBomb, Input p1 (Move Down)]
+                      , [ "########"
+                        , "#Q++ #2#"
+                        , "#1   ###"
                         , "######"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Right)]
-                      , [ "######"
-                        , "#Q++ #"
-                        , "# 1  #"
+                    , ( [Input p1 (Move Bombastic.Right)]
+                      , [ "########"
+                        , "#Q++ #2#"
+                        , "# 1  ###"
                         , "######"
                         ]
                       )
-                    , ( [Input player (Move Down)]
-                      , [ "######"
-                        , "#Q++ #"
-                        , "# 1  #"
-                        , "######"
-                        ]
-                      )
-                    , ( []
-                      , [ "######"
-                        , "#~~+ #"
-                        , "#~1  #"
+                    , ( [Input p1 (Move Down)]
+                      , [ "########"
+                        , "#Q++ #2#"
+                        , "# 1  ###"
                         , "######"
                         ]
                       )
                     , ( []
-                      , [ "######"
-                        , "# f+ #"
-                        , "# 1  #"
-                        , "######"
-                        ]
-                      )
-                    , ( [Input player (Move Up)]
-                      , [ "######"
-                        , "# 1+ #"
-                        , "#    #"
-                        , "######"
-                        ]
-                      )
-                    , ( [Input player DropBomb, Input player (Move Down)]
-                      , [ "######"
-                        , "# Q+ #"
-                        , "# 1  #"
-                        , "######"
-                        ]
-                      )
-                    , ( [Input player (Move Bombastic.Right)]
-                      , [ "######"
-                        , "# Q+ #"
-                        , "#  1 #"
+                      , [ "########"
+                        , "#~~+ #2#"
+                        , "#~1  ###"
                         , "######"
                         ]
                       )
                     , ( []
-                      , [ "######"
-                        , "# Q+ #"
-                        , "#   1#"
+                      , [ "########"
+                        , "# f+ #2#"
+                        , "# 1  ###"
                         , "######"
                         ]
                       )
-                    , ( [Input player (Move Up)]
-                      , [ "######"
-                        , "#~~~1#"
-                        , "# ~  #"
+                    , ( [Input p1 (Move Up)]
+                      , [ "########"
+                        , "# 1+ #2#"
+                        , "#    ###"
                         , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
-                      , [ "######"
-                        , "#  fQ#"
-                        , "#    #"
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
+                      , [ "########"
+                        , "# Q+ #2#"
+                        , "# 1  ###"
                         , "######"
                         ]
                       )
-                    , ( []
-                      , [ "######"
-                        , "#  fQ#"
-                        , "#    #"
-                        , "######"
-                        ]
-                      )
-                    , ( []
-                      , [ "######"
-                        , "#  fQ#"
-                        , "#    #"
+                    , ( [Input p1 (Move Bombastic.Right)]
+                      , [ "########"
+                        , "# Q+ #2#"
+                        , "#  1 ###"
                         , "######"
                         ]
                       )
                     , ( []
-                      , [ "######"
-                        , "# ~~~#"
-                        , "#   ~#"
+                      , [ "########"
+                        , "# Q+ #2#"
+                        , "#   1###"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input p1 (Move Up)]
+                      , [ "########"
+                        , "#~~~1#2#"
+                        , "# ~  ###"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input p1 DropBomb]
+                      , [ "########"
+                        , "#  fQ#2#"
+                        , "#    ###"
                         , "######"
                         ]
                       )
                     , ( []
-                      , [ "######"
-                        , "#    #"
-                        , "#    #"
+                      , [ "########"
+                        , "#  fQ#2#"
+                        , "#    ###"
                         , "######"
                         ]
+                      )
+                    , ( []
+                      , [ "########"
+                        , "#  fQ#2#"
+                        , "#    ###"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "########"
+                        , "# ~~~#2#"
+                        , "#   ~###"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , ["Winner: p2"]
                       )
                     ]
 
@@ -838,23 +884,23 @@ main = do
                     [ "#######"
                     , "#Sbbf #"
                     , "#     #"
-                    , "#     #"
+                    , "#S    #"
                     , "#######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#######"
                     , "#1bbf #"
                     , "#     #"
-                    , "#     #"
+                    , "#2    #"
                     , "#######"
                     ]
-                    [ ( [Input player (Move Bombastic.Right)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#######"
                         , "# 1bf #"
                         , "#     #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
@@ -862,7 +908,7 @@ main = do
                       , [ "#######"
                         , "#  1f #"
                         , "#     #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
@@ -870,39 +916,39 @@ main = do
                       , [ "#######"
                         , "#   1 #"
                         , "#     #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#######"
                         , "#   Q1#"
                         , "#     #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb, Input player (Move Down)]
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
                       , [ "#######"
                         , "#   QQ#"
                         , "#    1#"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#######"
                         , "#   QQ#"
                         , "#    Q#"
-                        , "#    1#"
+                        , "#2   1#"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#######"
                         , "# ~~~~#"
                         , "#  ~~~#"
-                        , "#   ~~#"
+                        , "#2  ~~#"
                         , "#######"
                         ]
                       )
@@ -913,23 +959,23 @@ main = do
                     [ "#######"
                     , "#Sbbf #"
                     , "#   + #"
-                    , "#     #"
+                    , "#S    #"
                     , "#######"
                     ]
-                    [player]
+                    players
                     g
                     (\g' -> (g', Powerup FlamePowerup))
                     [ "#######"
                     , "#1bbf #"
                     , "#   + #"
-                    , "#     #"
+                    , "#2    #"
                     , "#######"
                     ]
-                    [ ( [Input player (Move Bombastic.Right)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#######"
                         , "# 1bf #"
                         , "#   + #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
@@ -937,7 +983,7 @@ main = do
                       , [ "#######"
                         , "#  1f #"
                         , "#   + #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
@@ -945,31 +991,31 @@ main = do
                       , [ "#######"
                         , "#   1 #"
                         , "#   + #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#######"
                         , "#   Q1#"
                         , "#   + #"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb, Input player (Move Down)]
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
                       , [ "#######"
                         , "#   QQ#"
                         , "#   +1#"
-                        , "#     #"
+                        , "#2    #"
                         , "#######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#######"
                         , "#   QQ#"
                         , "#   +Q#"
-                        , "#    1#"
+                        , "#2   1#"
                         , "#######"
                         ]
                       )
@@ -977,91 +1023,82 @@ main = do
                       , [ "#######"
                         , "# ~~~~#"
                         , "#  ~~~#"
-                        , "#    ~#"
+                        , "#2   ~#"
                         , "#######"
                         ]
                       )
                     , ( []
-                      , [ "#######"
-                        , "#     #"
-                        , "#   f #"
-                        , "#     #"
-                        , "#######"
-                        ]
+                      , ["Winner: p2"]
                       )
                     ]
 
             it "hammering drop bomb makes no difference if player dies" $ do
                 assertSeries
-                    [ "####"
-                    , "#S #"
-                    , "####"
+                    [ "######"
+                    , "#S #S#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
-                    [ "####"
-                    , "#1 #"
-                    , "####"
+                    [ "######"
+                    , "#1 #2#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Bombastic.Right)]
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                    [ ( [Input p1 DropBomb, Input p1 (Move Bombastic.Right)]
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                    , ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q1#"
-                        , "####"
+                    , ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q1#2#"
+                        , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                    , ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#~~#2#"
+                        , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
-                      , [ "####"
-                        , "#  #"
-                        , "####"
-                        ]
+                    , ( [Input p1 DropBomb]
+                      , ["Winner: p2"]
                       )
                     ]
 
         context "powerups" $ do
             let
-                player = mkDebugParticipant 1 "p1"
 
             it "player cannot drop more than one bomb" $ do
                 assertSeries
                     [ "#####"
-                    , "#S  #"
+                    , "#S S#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "#1  #"
+                    , "#1 2#"
                     , "#####"
                     ]
-                    [ ( [ Input player (Move Bombastic.Right)
-                        , Input player DropBomb
+                    [ ( [ Input p1 (Move Bombastic.Right)
+                        , Input p1 DropBomb
                         ]
                       , [ "#####"
-                        , "#Q1 #"
+                        , "#Q12#"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#####"
                         , "#Q 1#"
                         , "#####"
@@ -1074,55 +1111,55 @@ main = do
                     [ "######"
                     , "#S + #"
                     , "# +  #"
-                    , "#+   #"
+                    , "#+  S#"
                     , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "######"
                     , "#1 + #"
                     , "# +  #"
-                    , "#+   #"
+                    , "#+  2#"
                     , "######"
                     ]
-                    [ ( [Input player (Move Down)]
+                    [ ( [Input p1 (Move Down)]
                       , [ "######"
                         , "#  + #"
                         , "#1+  #"
-                        , "#+   #"
+                        , "#+  2#"
                         , "######"
                         ]
                       )
-                    , ( [Input player DropBomb, Input player (Move Up)]
+                    , ( [Input p1 DropBomb, Input p1 (Move Up)]
                       , [ "######"
                         , "#1 + #"
                         , "#Q+  #"
-                        , "#+   #"
+                        , "#+  2#"
                         , "######"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Right)]
+                    , ( [Input p1 (Move Bombastic.Right)]
                       , [ "######"
                         , "# 1+ #"
                         , "#Q+  #"
-                        , "#+   #"
+                        , "#+  2#"
                         , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "######"
                         , "# 1+ #"
                         , "#Q+  #"
-                        , "#+   #"
+                        , "#+  2#"
                         , "######"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "######"
                         , "#~Q+ #"
                         , "#~~  #"
-                        , "#~   #"
+                        , "#~  2#"
                         , "######"
                         ]
                       )
@@ -1130,45 +1167,45 @@ main = do
 
             it "can drop flame powerup from tests" $ do
                 assertSeries
-                    [ "####"
-                    , "#S+#"
-                    , "####"
+                    [ "######"
+                    , "#S+SS#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     (\g' -> (g', Powerup FlamePowerup))
-                    [ "####"
-                    , "#1+#"
-                    , "####"
+                    [ "######"
+                    , "#1+23#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                    [ ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                      , [ "######"
+                        , "#~~23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "# f#"
-                        , "####"
+                      , [ "######"
+                        , "# f23#"
+                        , "######"
                         ]
                       )
                     ]
@@ -1176,57 +1213,57 @@ main = do
             it "flame powerup increases flame length" $ do
                 assertSeries
                     [ "#####"
-                    , "# f #"
+                    , "#Sf #"
                     , "# S #"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "# f #"
-                    , "# 1 #"
+                    , "#1f #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Up)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "# 1 #"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Right)]
+                    , ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "#  1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb, Input player (Move Down)]
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
                       , [ "#####"
                         , "#  Q#"
-                        , "#  1#"
+                        , "# 21#"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input p1 (Move Bombastic.Left)]
+                      , [ "#####"
+                        , "#  Q#"
+                        , "# 1 #"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
                         , "#  Q#"
-                        , "#  1#"
-                        , "#####"
-                        ]
-                      )
-                    , ( []
-                      , [ "#####"
-                        , "#  Q#"
-                        , "#  1#"
+                        , "#12 #"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
                         , "#~~~#"
-                        , "#  ~#"
+                        , "#12~#"
                         , "#####"
                         ]
                       )
@@ -1236,70 +1273,73 @@ main = do
                 assertSeries
                     [ "######"
                     , "#  f #"
-                    , "#  S #"
+                    , "#  SS#"
                     , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "######"
                     , "#  f #"
-                    , "#  1 #"
+                    , "#  12#"
                     , "######"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Up)]
+                    [ ( [ Input p2 (Move Bombastic.Left)
+                        , Input p1 DropBomb
+                        , Input p1 (Move Up)
+                        ]
                       , [ "######"
                         , "#  1 #"
                         , "#  Q #"
                         , "######"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Right)]
+                    , ( [Input p1 (Move Bombastic.Right)]
                       , [ "######"
                         , "#   1#"
-                        , "#  Q #"
+                        , "# 2Q #"
                         , "######"
                         ]
                       )
                     , ( []
                       , [ "######"
                         , "#   1#"
-                        , "#  Q #"
+                        , "#2 Q #"
                         , "######"
                         ]
                       )
                     , ( []
                       , [ "######"
                         , "#  ~1#"
+                        , "#2~~~#"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
+                      , [ "######"
+                        , "#   Q#"
+                        , "#2  1#"
+                        , "######"
+                        ]
+                      )
+                    , ( [Input p1 (Move Bombastic.Left)]
+                      , [ "######"
+                        , "#   Q#"
+                        , "#2 1 #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
+                        , "#   Q#"
+                        , "#21  #"
+                        , "######"
+                        ]
+                      )
+                    , ( []
+                      , [ "######"
                         , "# ~~~#"
-                        , "######"
-                        ]
-                      )
-                    , ( [Input player DropBomb, Input player (Move Down)]
-                      , [ "######"
-                        , "#   Q#"
-                        , "#   1#"
-                        , "######"
-                        ]
-                      )
-                    , ( []
-                      , [ "######"
-                        , "#   Q#"
-                        , "#   1#"
-                        , "######"
-                        ]
-                      )
-                    , ( []
-                      , [ "######"
-                        , "#   Q#"
-                        , "#   1#"
-                        , "######"
-                        ]
-                      )
-                    , ( []
-                      , [ "######"
-                        , "# ~~~#"
-                        , "#   ~#"
+                        , "#1  ~#"
                         , "######"
                         ]
                       )
@@ -1309,48 +1349,48 @@ main = do
                 assertSeries
                     [ "#####"
                     , "# f #"
-                    , "# S #"
+                    , "# SS#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "# f #"
-                    , "# 1 #"
+                    , "# 12#"
                     , "#####"
                     ]
-                    [ ( [Input player DropBomb]
+                    [ ( [Input p1 DropBomb, Input p1 (Move Bombastic.Left)]
                       , [ "#####"
                         , "# f #"
+                        , "#1Q2#"
+                        , "#####"
+                        ]
+                      )
+                    , ( [Input p1 (Move Up), Input p2 (Move Up)]
+                      , [ "#####"
+                        , "#1f2#"
                         , "# Q #"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
-                        , "# f #"
+                        , "#1f2#"
                         , "# Q #"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
-                        , "# f #"
-                        , "# Q #"
-                        , "#####"
-                        ]
-                      )
-                    , ( []
-                      , [ "#####"
-                        , "# ~ #"
+                        , "#1~2#"
                         , "#~~~#"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
-                        , "#   #"
+                        , "#1 2#"
                         , "#   #"
                         , "#####"
                         ]
@@ -1359,45 +1399,45 @@ main = do
 
             it "can drop bomb powerup from tests" $ do
                 assertSeries
-                    [ "####"
-                    , "#S+#"
-                    , "####"
+                    [ "######"
+                    , "#S+SS#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     (\g' -> (g', Powerup BombPowerup))
-                    [ "####"
-                    , "#1+#"
-                    , "####"
+                    [ "######"
+                    , "#1+23#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb]
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                    [ ( [Input p1 DropBomb]
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#Q+#"
-                        , "####"
+                      , [ "######"
+                        , "#Q+23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "#~~#"
-                        , "####"
+                      , [ "######"
+                        , "#~~23#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "####"
-                        , "# b#"
-                        , "####"
+                      , [ "######"
+                        , "# b23#"
+                        , "######"
                         ]
                       )
                     ]
@@ -1405,43 +1445,43 @@ main = do
             it "bomb powerup increases number of bombs you can drop" $ do
                 assertSeries
                     [ "#####"
-                    , "# b #"
+                    , "#Sb #"
                     , "# S #"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
-                    , "# b #"
-                    , "# 1 #"
+                    , "#1b #"
+                    , "# 2 #"
                     , "#####"
                     ]
-                    [ ( [Input player (Move Up)]
+                    [ ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "# 1 #"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player (Move Bombastic.Right)]
+                    , ( [Input p1 (Move Bombastic.Right)]
                       , [ "#####"
                         , "#  1#"
-                        , "#   #"
+                        , "# 2 #"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb, Input player (Move Down)]
+                    , ( [Input p1 DropBomb, Input p1 (Move Down)]
                       , [ "#####"
                         , "#  Q#"
-                        , "#  1#"
+                        , "# 21#"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#####"
                         , "#  Q#"
-                        , "#  Q#"
+                        , "# 2Q#"
                         , "#####"
                         ]
                       )
@@ -1451,28 +1491,28 @@ main = do
                 assertSeries
                     [ "#####"
                     , "# b #"
-                    , "# S #"
+                    , "# SS#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "# b #"
-                    , "# 1 #"
+                    , "# 12#"
                     , "#####"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Up)]
+                    [ ( [Input p1 DropBomb, Input p1 (Move Up)]
                       , [ "#####"
                         , "# 1 #"
-                        , "# Q #"
+                        , "# Q2#"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#####"
                         , "# Q #"
-                        , "# Q #"
+                        , "# Q2#"
                         , "#####"
                         ]
                       )
@@ -1482,35 +1522,35 @@ main = do
                 assertSeries
                     [ "#####"
                     , "# b #"
-                    , "# S #"
+                    , "# SS#"
                     , "#####"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
                     [ "#####"
                     , "# b #"
-                    , "# 1 #"
+                    , "# 12#"
                     , "#####"
                     ]
-                    [ ( [Input player DropBomb, Input player (Move Up)]
+                    [ ( [Input p1 DropBomb, Input p1 (Move Up)]
                       , [ "#####"
                         , "# 1 #"
-                        , "# Q #"
+                        , "# Q2#"
                         , "#####"
                         ]
                       )
-                    , ( [Input player DropBomb]
+                    , ( [Input p1 DropBomb]
                       , [ "#####"
                         , "# Q #"
-                        , "# Q #"
+                        , "# Q2#"
                         , "#####"
                         ]
                       )
                     , ( []
                       , [ "#####"
                         , "# Q #"
-                        , "# Q #"
+                        , "# Q2#"
                         , "#####"
                         ]
                       )
@@ -1520,57 +1560,60 @@ main = do
                         , "#~~~#"
                         , "#####"
                         ]
+                      )
+                    , ( []
+                      , ["Draw"]
                       )
                     ]
 
             it "bomb powerup is destructible" $ do
                 assertSeries
-                    [ "#####"
-                    , "# b #"
-                    , "# S #"
-                    , "#####"
+                    [ "######"
+                    , "# b  #"
+                    , "# S S#"
+                    , "######"
                     ]
-                    [player]
+                    players
                     g
                     explosionResultNoPowerup
-                    [ "#####"
-                    , "# b #"
-                    , "# 1 #"
-                    , "#####"
+                    [ "######"
+                    , "# b  #"
+                    , "# 1 2#"
+                    , "######"
                     ]
-                    [ ( [Input player DropBomb]
-                      , [ "#####"
-                        , "# b #"
-                        , "# Q #"
-                        , "#####"
+                    [ ( [Input p1 DropBomb, Input p1 (Move Bombastic.Right)]
+                      , [ "######"
+                        , "# b  #"
+                        , "# Q12#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "#####"
-                        , "# b #"
-                        , "# Q #"
-                        , "#####"
+                      , [ "######"
+                        , "# b  #"
+                        , "# Q 1#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "#####"
-                        , "# b #"
-                        , "# Q #"
-                        , "#####"
+                      , [ "######"
+                        , "# b  #"
+                        , "# Q 1#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "#####"
-                        , "# ~ #"
-                        , "#~~~#"
-                        , "#####"
+                      , [ "######"
+                        , "# ~  #"
+                        , "#~~~1#"
+                        , "######"
                         ]
                       )
                     , ( []
-                      , [ "#####"
-                        , "#   #"
-                        , "#   #"
-                        , "#####"
+                      , [ "######"
+                        , "#    #"
+                        , "#   1#"
+                        , "######"
                         ]
                       )
                     ]

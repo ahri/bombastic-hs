@@ -303,7 +303,7 @@ queueAction participant action (GameInProgress g erF board players bombCells)
 queueAction _ _ s  = s
 
 tick :: GameState -> GameState
-tick = processPlayerActions . processBombs . clearFlame
+tick = processPlayerActions . processBombs . endGame . clearFlame
     where
         clearFlame (GameInProgress g erF (Board cells) players bombCells) = GameInProgress (fst blah) erF (Board . snd $ blah) players bombCells
             where
@@ -377,6 +377,18 @@ tick = processPlayerActions . processBombs . clearFlame
                     | otherwise = p : kill c ps
         processBombs s = s
 
+        endGame s@(GameInProgress _ _ _ players _) = case length activePlayers of
+            0 -> GameDrawn
+            1 -> GameWon (getPtc . head $ activePlayers)
+            _ -> s
+            where
+                activePlayers = filter activePlayer $ players
+                activePlayer (ConnectedPlayer _ _ _ _ _) = True
+                activePlayer _ = False
+                getPtc (ConnectedPlayer ptc _ _ _ _) = ptc
+                getPtc _ = error "wtf"
+        endGame s = s
+
         processPlayerActions (GameInProgress g erF board players bombCells) = foldr go (GameInProgress g erF board [] bombCells) players
             where
                 go :: Player -> GameState -> GameState
@@ -430,7 +442,7 @@ tick = processPlayerActions . processBombs . clearFlame
                                 : ps
                                 )
                                 droppedBombCells
-                        QuitGame -> GameInProgress g' erF' b (p : ps) bcs -- TODO: add test & implement
+                        QuitGame -> GameInProgress g' erF' b (NoLongerPlaying ptc Quit : ps) bcs -- TODO: add test & implement
                 go _ s = s
 
                 dropBomb b _ bcs _ bc@(BombCount 0) _ = (b, bcs, bc)
