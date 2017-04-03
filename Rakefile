@@ -23,6 +23,11 @@ task :test do
   verbose(false) { sh "stack test 2>&1" }
 end
 
+desc "Watch the tests for the program"
+task :watch do
+  sh "stack build --file-watch --test"
+end
+
 desc "Lint the program"
 task :lint do
   verbose(true) { sh "hlint #{production_code}" }
